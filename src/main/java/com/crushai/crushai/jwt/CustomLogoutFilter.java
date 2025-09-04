@@ -37,17 +37,10 @@ public class CustomLogoutFilter extends GenericFilterBean {
             return;
         }
 
-        String refresh = request.getHeader("refresh");
+        String refresh = request.getHeader("refreshToken");
 
         if (refresh == null || refresh.trim().isEmpty()) {
             sendJsonError(response, HttpServletResponse.SC_BAD_REQUEST, "Refresh token is missing.");
-            return;
-        }
-
-        try {
-            jwtUtil.isExpired(refresh);
-        } catch (ExpiredJwtException e) {
-            sendJsonError(response, HttpServletResponse.SC_BAD_REQUEST, "Refresh token is expired.");
             return;
         }
 
@@ -57,14 +50,9 @@ public class CustomLogoutFilter extends GenericFilterBean {
             return;
         }
 
-        boolean isExist = refreshRepository.existsByRefresh(refresh);
-        if (!isExist) {
-            sendJsonError(response, HttpServletResponse.SC_BAD_REQUEST, "Token does not exist in DB.");
-            return;
-        }
-
-        // Delete refresh token from DB
-        refreshRepository.deleteByRefresh(refresh);
+        // delete all refreshToken by user's email
+        String userEmail = jwtUtil.getUsername(refresh);
+        refreshRepository.deleteAllByEmail(userEmail);
 
         // Success response
         response.setStatus(HttpServletResponse.SC_OK);

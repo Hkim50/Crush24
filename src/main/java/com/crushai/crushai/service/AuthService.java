@@ -74,6 +74,7 @@ public class AuthService {
 
         String sub = (String) claims.get("sub");
         String email = (String) claims.get("email");
+        System.out.println(claims.toString());
 
         UserEntity user = userRepository.findByAppleIdSub(sub)
                 .or(() -> Optional.ofNullable(email).flatMap(userRepository::findByEmail))

@@ -28,7 +28,7 @@ public class JWTFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
-        String accessToken = request.getHeader("access");
+        String accessToken = request.getHeader("accessToken");
 
         if (accessToken == null) {
             filterChain.doFilter(request, response);
@@ -44,7 +44,7 @@ public class JWTFilter extends OncePerRequestFilter {
 
         String category = jwtUtil.getCategory(accessToken);
 
-        if (!category.equals("access")) {
+        if (!category.equals("accessToken")) {
             sendJsonError(response, HttpServletResponse.SC_UNAUTHORIZED, "Invalid access token");
             return;
         }

@@ -58,8 +58,8 @@ public class TokenService {
         }
 
         // 새로운 토큰 발급
-        String newAccess = jwtUtil.createJwt("access", username, role, 3600_000L);      // 1시간
-        String newRefresh = jwtUtil.createJwt("refresh", username, role, 14L * 24 * 3600_000L);  // 14일
+        String newAccess = jwtUtil.createJwt("accessToken", username, role, 3600_000L);      // 1시간
+        String newRefresh = jwtUtil.createJwt("refreshToken", username, role, 14L * 24 * 3600_000L);  // 14일
 
         //Refresh 토큰 저장 DB에 기존의 Refresh 토큰 삭제 후 새 Refresh 토큰 저장
         repository.deleteByRefresh(refreshToken);
