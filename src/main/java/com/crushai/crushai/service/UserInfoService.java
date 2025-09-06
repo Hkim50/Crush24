@@ -15,5 +15,5 @@ public interface UserInfoService {
     // check if image is greater than 2 and less than 5
     Boolean isValidImages(List<MultipartFile> images);
 
-    ResponseEntity<?> saveUserInfo(UserInfoDto userInfoDto) throws IllegalArgumentException;
+    ResponseEntity<?> saveUserInfo(UserInfoDto userInfoDto, List<MultipartFile> images) throws IllegalArgumentException;
 }

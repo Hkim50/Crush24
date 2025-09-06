@@ -28,7 +28,7 @@ public class UserInfoServiceImpl implements UserInfoService{
     }
 
     @Override
-    public ResponseEntity<?> saveUserInfo(UserInfoDto userInfoDto) throws IllegalArgumentException {
+    public ResponseEntity<?> saveUserInfo(UserInfoDto userInfoDto, List<MultipartFile> images) throws IllegalArgumentException {
         return null;
     }
 
