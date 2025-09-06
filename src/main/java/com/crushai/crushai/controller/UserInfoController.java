@@ -15,7 +15,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/info")
+@RequestMapping("/api")
 public class UserInfoController {
 
     private final UserInfoServiceImpl userInfoService;
@@ -24,14 +24,15 @@ public class UserInfoController {
         this.userInfoService = userInfoService;
     }
 
-    @PostMapping(value = "/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/onboarding", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> createUserInfo(@RequestPart("userInfo") @Valid UserInfoDto userInfoDto,
                                             @RequestPart("images") List<MultipartFile> images) {
 
-        if (images.size() > 5 || images.size() < 1) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        if (images.size() > 5 || images.size() < 2) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("You can upload a maximum of 5 photos, with a minimum of 2.");
         }
 
         return userInfoService.saveUserInfo(userInfoDto, images);
     }
+
 }

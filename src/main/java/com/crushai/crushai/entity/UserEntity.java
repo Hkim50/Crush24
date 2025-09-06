@@ -42,6 +42,9 @@ public class UserEntity {
     @Column(unique = true)
     private String facebookId;
 
+    @Column(nullable = false)
+    private Boolean onboarding_completed = false;
+
     // 기본 생성자
     public UserEntity(String email, String password) {
         this.email = email;

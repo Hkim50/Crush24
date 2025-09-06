@@ -1,5 +1,7 @@
 package com.crushai.crushai.enums;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
 
@@ -14,16 +16,18 @@ public enum Gender {
         this.value = value;
     }
 
-    // 열거형이 가진 값을 반환하는 getter 메서드
+    // This method is optional but can be useful for serialization.
+    @JsonValue
     public String getValue() {
         return this.value;
     }
 
-    // 문자열을 Gender 열거형으로 변환하는 정적 팩토리 메서드
+    // This single method handles both JSON deserialization and general string-to-enum conversion.
+    @JsonCreator
     public static Gender fromString(String text) {
         return Arrays.stream(Gender.values())
                 .filter(gender -> gender.value.equalsIgnoreCase(text))
                 .findFirst()
-                .orElseThrow(() -> new NoSuchElementException("No constant with text: " + text + " found"));
+                .orElseThrow(() -> new IllegalArgumentException("No constant with text: " + text + " found"));
     }
 }

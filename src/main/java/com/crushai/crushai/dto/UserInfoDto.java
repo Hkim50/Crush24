@@ -36,10 +36,8 @@ public class UserInfoDto {
     // 매칭 대상 성별: 최소 1개
     @Size(min = 1, message = "매칭 대상 성별은 최소 하나 이상 선택해야 합니다.")
     @NotNull(message = "매칭 대상 성별은 필수 입력 항목입니다.")
-    private List<Gender> showMeGender; // Enum 리스트로 관리하는 것을 추천
+    private List<Gender> showMeGender;
 
     // 사진: 2장에서 5장
-    @Size(min = 2, max = 5, message = "사진은 2장에서 5장까지 등록할 수 있습니다.")
-    @NotNull(message = "사진은 필수 입력 항목입니다.")
     private List<String> photos; // 이미지 URL 또는 파일 이름 리스트
 }
