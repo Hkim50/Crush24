@@ -1,6 +1,9 @@
 package com.crushai.crushai.service;
 
+import com.crushai.crushai.dto.CustomUserDetails;
 import com.crushai.crushai.dto.UserInfoDto;
+import com.crushai.crushai.entity.UserEntity;
+import com.crushai.crushai.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -23,8 +26,14 @@ public class UserInfoServiceImpl implements UserInfoService {
     @Value("${file.upload-dir}")
     private String uploadDir;
 
+    private final UserRepository userRepository;
+
+    public UserInfoServiceImpl(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
+
     @Override
-    public ResponseEntity<?> saveUserInfo(UserInfoDto userInfoDto, List<MultipartFile> images) {
+    public ResponseEntity<?> saveUserInfo(UserInfoDto userInfoDto, List<MultipartFile> images, CustomUserDetails userDetails) {
 
         if (!isValidBirthdate(userInfoDto.getBirthDate())) {
             return ResponseEntity.badRequest().body(Map.of("error", "User must be at least 18 years old."));
@@ -58,6 +67,14 @@ public class UserInfoServiceImpl implements UserInfoService {
 
             // TODO: Save to DB
             // userInfoRepository.save(userInfoDto);
+
+            // 온보딩 set true
+            userRepository.findByEmail(userDetails.getUsername())
+                    .ifPresent(userEntity -> {
+                        userEntity.setOnboardingCompleted(true);
+                        userRepository.save(userEntity);
+                    });
+
 
             return ResponseEntity.ok(Map.of(
                     "message", "User info and images saved successfully",

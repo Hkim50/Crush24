@@ -43,7 +43,7 @@ public class UserEntity {
     private String facebookId;
 
     @Column(nullable = false)
-    private Boolean onboarding_completed = false;
+    private Boolean onboardingCompleted = false;
 
     // 기본 생성자
     public UserEntity(String email, String password) {
@@ -75,14 +75,14 @@ public class UserEntity {
         this.loginType = loginType;
     }
 
-
-
     // for apple
     public UserEntity(String email, Role role, LoginType loginType, String appleIdSub) {
         this.email = email;
         this.role = role;
         this.loginType = loginType;
         this.appleIdSub = appleIdSub;
+        // default false
+        this.onboardingCompleted = false;
     }
 
     // for google
@@ -91,6 +91,8 @@ public class UserEntity {
         this.role = role;
         this.loginType = loginType;
         this.googleId = googleId;
+        // default false
+        this.onboardingCompleted = false;
     }
 
     // for facebook
@@ -99,6 +101,8 @@ public class UserEntity {
         this.role = role;
         this.loginType = loginType;
         this.facebookId = facebookId;
+        // default false
+        this.onboardingCompleted = false;
     }
 
     public void upgradeToPremium(LocalDate expirationDate) {
@@ -119,5 +123,9 @@ public class UserEntity {
     }
     public void setAppleIdSub(String appleIdSub) {
         this.appleIdSub = appleIdSub;
+    }
+
+    public void setOnboardingCompleted(Boolean onboardingCompleted) {
+        this.onboardingCompleted = onboardingCompleted;
     }
 }

@@ -139,6 +139,9 @@ public class AuthService {
         Map<String, String> tokens = new HashMap<>();
         tokens.put("accessToken", access);
         tokens.put("refreshToken", refresh);
+        // 온보딩 체크
+        tokens.put("onboardingCompleted", String.valueOf(user.getOnboardingCompleted()));
         return tokens;
     }
+
 }

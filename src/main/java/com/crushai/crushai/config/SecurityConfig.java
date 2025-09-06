@@ -62,7 +62,7 @@ public class SecurityConfig {
         //경로별 인가 작업
         http
                 .authorizeHttpRequests((auth) -> auth
-                        .requestMatchers( "/join", "/reissue", "/auth/**", "/api/**").permitAll() // /join 경로 없애야 함.
+                        .requestMatchers( "/join", "/reissue", "/auth/**").permitAll() // /join 경로 없애야 함. , "/api/**"
                         .anyRequest().authenticated());
 
         http
