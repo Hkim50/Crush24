@@ -53,9 +53,9 @@ public class UserInfoServiceImpl implements UserInfoService {
                 String fileExtension = (originalFilename != null && originalFilename.contains("."))
                         ? originalFilename.substring(originalFilename.lastIndexOf(".")) : "";
 
-                if (!fileExtension.toLowerCase().matches("\\.(jpg|jpeg|png|gif|heic)$")) {
-                    return ResponseEntity.badRequest().body(Map.of("error", "Only image files are allowed."));
-                }
+//                if (!fileExtension.toLowerCase().matches("\\.(jpg|jpeg|png|gif|heic)$")) {
+//                    return ResponseEntity.badRequest().body(Map.of("error", "Only image files are allowed."));
+//                }
 
                 String uniqueFilename = UUID.randomUUID() + fileExtension;
                 Path filePath = uploadPath.resolve(uniqueFilename).normalize();
