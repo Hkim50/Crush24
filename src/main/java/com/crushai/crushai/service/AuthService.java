@@ -129,8 +129,8 @@ public class AuthService {
     }
 
     private Map<String, String> generateTokens(UserEntity user) {
-        String access = jwtUtil.createJwt("access", user.getEmail(), user.getRole().name(), 3600_000L); // 1시간
-        String refresh = jwtUtil.createJwt("refresh", user.getEmail(), user.getRole().name(), 14L * 24 * 3600_000L); // 14일
+        String access = jwtUtil.createJwt("accessToken", user.getEmail(), user.getRole().name(), 3600_000L); // 1시간
+        String refresh = jwtUtil.createJwt("refreshToken", user.getEmail(), user.getRole().name(), 14L * 24 * 3600_000L); // 14일
 
         String expiresAt = Instant.now().plusSeconds(14 * 24 * 60 * 60).toString();
 
@@ -141,6 +141,7 @@ public class AuthService {
         tokens.put("refreshToken", refresh);
         // 온보딩 체크
         tokens.put("onboardingCompleted", String.valueOf(user.getOnboardingCompleted()));
+        System.out.println(tokens.toString());
         return tokens;
     }
 

@@ -39,7 +39,7 @@ public class TokenService {
 
         // refresh인지 확인
         String category = jwtUtil.getCategory(refreshToken);
-        if (!"refresh".equals(category)) {
+        if (!"refreshToken".equals(category)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("invalid token type");
         }
 

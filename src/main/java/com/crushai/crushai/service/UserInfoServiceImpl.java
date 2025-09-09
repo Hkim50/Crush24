@@ -4,6 +4,7 @@ import com.crushai.crushai.dto.CustomUserDetails;
 import com.crushai.crushai.dto.UserInfoDto;
 import com.crushai.crushai.entity.UserEntity;
 import com.crushai.crushai.repository.UserRepository;
+import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +22,7 @@ import java.util.*;
 
 @Service
 @Slf4j
+@Transactional
 public class UserInfoServiceImpl implements UserInfoService {
 
     @Value("${file.upload-dir}")
@@ -72,7 +74,6 @@ public class UserInfoServiceImpl implements UserInfoService {
             userRepository.findByEmail(userDetails.getUsername())
                     .ifPresent(userEntity -> {
                         userEntity.setOnboardingCompleted(true);
-                        userRepository.save(userEntity);
                     });
 
 

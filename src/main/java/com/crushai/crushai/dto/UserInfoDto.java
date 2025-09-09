@@ -16,7 +16,6 @@ import java.util.List;
 @NoArgsConstructor
 public class UserInfoDto {
 
-    // 이름: OAuth에서 가져오지만 수정 가능하므로 비어 있으면 안 됨
     @NotBlank(message = "이름은 필수 입력 항목입니다.")
     private String name;
 
