@@ -1,5 +1,6 @@
 package com.crushai.crushai.entity;
 
+import jakarta.annotation.Nullable;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -16,11 +17,14 @@ public class UserEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private UserInfoEntity userInfo;
+
     @Column(unique = true)
     private String email;
 
     private String password;
-
+    
     @Enumerated(EnumType.STRING)
     private Role role;
 
@@ -127,5 +131,12 @@ public class UserEntity {
 
     public void setOnboardingCompleted(Boolean onboardingCompleted) {
         this.onboardingCompleted = onboardingCompleted;
+    }
+
+    public void setUserInfo(UserInfoEntity userInfo) {
+        this.userInfo = userInfo;
+        if (userInfo != null) {
+            userInfo.setUser(this);
+        }
     }
 }
