@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Date;
 import java.util.List;
 
 @Entity
@@ -28,7 +29,7 @@ public class UserInfoEntity {
 
     private String nickname;
 
-    private LocalDate birthDate;
+    private Date birthDate;
 
     @Enumerated(EnumType.STRING)
     private Gender gender;
@@ -48,7 +49,7 @@ public class UserInfoEntity {
     private List<String> photoUrls;
 
     @Builder
-    public UserInfoEntity(String nickname, LocalDate birthDate, Gender gender, String location, List<Gender> showMeGender, List<String> photoUrls) {
+    public UserInfoEntity(String nickname, Date birthDate, Gender gender, String location, List<Gender> showMeGender, List<String> photoUrls) {
         this.nickname = nickname;
         this.birthDate = birthDate;
         this.gender = gender;
@@ -61,12 +62,24 @@ public class UserInfoEntity {
     public static UserInfoEntity toEntity(UserInfoDto dto, List<String> photoPaths) {
         return UserInfoEntity.builder()
                 .nickname(dto.getName())
-                .birthDate(dto.getBirthDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDate())
+                .birthDate(dto.getBirthDate())
                 .gender(dto.getGender())
                 .location(dto.getLocation())
                 .showMeGender(dto.getShowMeGender())
                 .photoUrls(photoPaths)
                 .build();
+    }
+
+    public UserInfoDto toDto() {
+        return new UserInfoDto(this.nickname, this.birthDate, this.gender, this.location, this.showMeGender, this.photoUrls);
+    }
+
+    public void updateProfile(UserInfoDto dto) {
+        if (dto.getName() != null) this.nickname = dto.getName();
+        if (dto.getGender() != null) this.gender = dto.getGender();
+        if (dto.getLocation() != null) this.location = dto.getLocation();
+        if (dto.getShowMeGender() != null) this.showMeGender = dto.getShowMeGender();
+        if (dto.getPhotos() != null) this.photoUrls = dto.getPhotos();
     }
 
     public void setUser(UserEntity user) {
