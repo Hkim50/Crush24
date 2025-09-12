@@ -3,17 +3,22 @@ package com.crushai.crushai.service;
 import com.crushai.crushai.dto.UserInfoDto;
 import com.crushai.crushai.entity.UserEntity;
 import com.crushai.crushai.entity.UserInfoEntity;
+import com.crushai.crushai.repository.RefreshRepository;
 import com.crushai.crushai.repository.UserRepository;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 @Service
 public class UserProfileService {
     private final UserRepository userRepository;
+    private final RefreshRepository refreshRepository;
 
-    public UserProfileService(UserRepository userRepository) {
+    public UserProfileService(UserRepository userRepository, RefreshRepository refreshRepository) {
         this.userRepository = userRepository;
+        this.refreshRepository = refreshRepository;
     }
 
     public UserInfoDto getUser(String email) {
@@ -50,5 +55,18 @@ public class UserProfileService {
 
         // 4. 변경된 엔티티를 다시 DTO로 변환하여 반환합니다.
         return userInfo.toDto();
+    }
+
+    @Transactional
+    public void deleteUser(String email) {
+        // 1. 이메일로 유저를 찾습니다. 없으면 예외를 발생시킵니다.
+        UserEntity user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
+
+        // 2. 해당 유저의 모든 리프레시 토큰을 삭제합니다.
+        refreshRepository.deleteAllByEmail(email);
+
+        // 3. 유저의 delYn 플래그를 true로 변경합니다.
+        user.deleteUser();
     }
 }

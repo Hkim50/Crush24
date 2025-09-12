@@ -39,4 +39,14 @@ public class UserController {
         // 업데이트된 사용자 정보를 응답 본문에 담아 200 OK를 반환합니다.
         return ResponseEntity.ok(updatedUser);
     }
+
+    @DeleteMapping("/delete")
+    public ResponseEntity<Void> deleteUser(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        try {
+            userProfileService.deleteUser(userDetails.getUsername());
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(500).build();
+        }
+    }
 }

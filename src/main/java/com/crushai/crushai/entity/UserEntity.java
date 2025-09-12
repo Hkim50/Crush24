@@ -49,6 +49,9 @@ public class UserEntity {
     @Column(nullable = false)
     private Boolean onboardingCompleted = false;
 
+    @Column(nullable = false)
+    private Boolean delYn = false;
+
     // 기본 생성자
     public UserEntity(String email, String password) {
         this.email = email;
@@ -138,5 +141,9 @@ public class UserEntity {
         if (userInfo != null) {
             userInfo.setUser(this);
         }
+    }
+
+    public void deleteUser() {
+        this.delYn = true;
     }
 }
