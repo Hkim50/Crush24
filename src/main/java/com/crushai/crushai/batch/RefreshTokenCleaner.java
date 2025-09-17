@@ -1,10 +1,12 @@
-package com.crushai.crushai.service;
+package com.crushai.crushai.batch;
 
 import com.crushai.crushai.repository.RefreshRepository;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 
+@Component
 public class RefreshTokenCleaner {
     private final RefreshRepository refreshRepository;
 

@@ -9,14 +9,16 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 
 @Service
-public class UserProfileService {
+public class UserService {
     private final UserRepository userRepository;
     private final RefreshRepository refreshRepository;
 
-    public UserProfileService(UserRepository userRepository, RefreshRepository refreshRepository) {
+    public UserService(UserRepository userRepository, RefreshRepository refreshRepository) {
         this.userRepository = userRepository;
         this.refreshRepository = refreshRepository;
     }
@@ -67,6 +69,14 @@ public class UserProfileService {
         refreshRepository.deleteAllByEmail(email);
 
         // 3. 유저의 delYn 플래그를 true로 변경합니다.
-        user.deleteUser();
+        user.deleteUser(Instant.now().plus(30, ChronoUnit.DAYS));
     }
+
+    @Transactional
+    public void deleteExpiredUsers(Instant now) {
+        List<UserEntity> usersToDelete = userRepository.findAllByDeletedTrueAndDeletedAtBefore(now);
+        userRepository.deleteAll(usersToDelete);
+    }
+
+
 }

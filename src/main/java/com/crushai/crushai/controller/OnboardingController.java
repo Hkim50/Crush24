@@ -18,11 +18,11 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api")
-public class UserInfoController {
+public class OnboardingController {
 
     private final UserInfoServiceImpl userInfoService;
 
-    public UserInfoController(UserInfoServiceImpl userInfoService) {
+    public OnboardingController(UserInfoServiceImpl userInfoService) {
         this.userInfoService = userInfoService;
     }
 

@@ -17,6 +17,9 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -56,14 +59,21 @@ public class AuthService {
 
         UserEntity user = userRepository.findByGoogleId(googleId)
                 .or(() -> Optional.ofNullable(email).flatMap(userRepository::findByEmail))
-                .orElseGet(() -> userRepository.save(new UserEntity(email, Role.USER, LoginType.GOOGLE, googleId, null))); // 수정 필요
+                .orElseGet(() -> userRepository.save(new UserEntity(email, Role.USER, LoginType.GOOGLE, googleId, null)));
+ 
+        boolean isReactivated = false;
+        // 탈퇴 상태 확인 후 복구
+        if (user.isDelYn()) {
+            // checkAndReactivateUser가 성공하면 true를 반환하도록 수정
+            isReactivated = checkAndReactivateUser(user);
+        }
 
         if (user.getGoogleId() == null) {
             user.setGoogleId(googleId);
             userRepository.save(user);
         }
-
-        return generateTokens(user);
+ 
+        return generateTokens(user, isReactivated);
     }
 
     public Map<String, String> loginWithApple(String identityToken, String clientId) {
@@ -79,13 +89,19 @@ public class AuthService {
         UserEntity user = userRepository.findByAppleIdSub(sub)
                 .or(() -> Optional.ofNullable(email).flatMap(userRepository::findByEmail))
                 .orElseGet(() -> userRepository.save(new UserEntity(email, Role.USER, LoginType.APPLE, sub)));
+ 
+        boolean isReactivated = false;
+        // 탈퇴 상태 확인 후 복구
+        if (user.isDelYn()) {
+            isReactivated = checkAndReactivateUser(user);
+        }
 
         if (user.getAppleIdSub() == null) {
             user.setAppleIdSub(sub);
             userRepository.save(user);
         }
-
-        return generateTokens(user);
+ 
+        return generateTokens(user, isReactivated);
     }
 
     public Map<String, String> loginWithFacebook(String accessToken) {
@@ -112,13 +128,19 @@ public class AuthService {
             UserEntity user = userRepository.findByFacebookId(facebookId)
                     .or(() -> Optional.ofNullable(email).flatMap(userRepository::findByEmail))
                     .orElseGet(() -> userRepository.save(new UserEntity(email, Role.USER, LoginType.FACEBOOK, null, null, facebookId)));
+ 
+            boolean isReactivated = false;
+            // 탈퇴 상태 확인 후 복구
+            if (user.isDelYn()) {
+                isReactivated = checkAndReactivateUser(user);
+            }
 
             if (user.getFacebookId() == null) {
                 user.setFacebookId(facebookId);
                 userRepository.save(user);
             }
-
-            return generateTokens(user);
+ 
+            return generateTokens(user, isReactivated);
 
         } catch (RestClientResponseException e) {
             String responseBody = e.getResponseBodyAsString();
@@ -128,7 +150,7 @@ public class AuthService {
         }
     }
 
-    private Map<String, String> generateTokens(UserEntity user) {
+    private Map<String, String> generateTokens(UserEntity user, boolean isReactivated) {
         String access = jwtUtil.createJwt("accessToken", user.getEmail(), user.getRole().name(), 3600_000L); // 1시간
         String refresh = jwtUtil.createJwt("refreshToken", user.getEmail(), user.getRole().name(), 14L * 24 * 3600_000L); // 14일
 
@@ -140,9 +162,22 @@ public class AuthService {
         tokens.put("accessToken", access);
         tokens.put("refreshToken", refresh);
         // 온보딩 체크
-        tokens.put("onboardingCompleted", String.valueOf(user.getOnboardingCompleted()));
+        tokens.put("onboardingCompleted", String.valueOf(user.isOnboardingCompleted()));
+        // 복귀 유저인지 여부를 응답에 추가
+        tokens.put("isReactivated", String.valueOf(isReactivated));
         System.out.println(tokens.toString());
         return tokens;
+    }
+
+    private boolean checkAndReactivateUser(UserEntity user) {
+        Instant deletedAt = user.getDeletedAt();
+
+        if (!Instant.now().isAfter(deletedAt)) {
+            user.reactivateUser();
+            return true; // 복구 성공
+        } else {
+            throw new RuntimeException("탈퇴 후 30일이 지나 로그인할 수 없습니다.");
+        }
     }
 
 }

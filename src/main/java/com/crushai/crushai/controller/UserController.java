@@ -2,7 +2,7 @@ package com.crushai.crushai.controller;
 
 import com.crushai.crushai.dto.CustomUserDetails;
 import com.crushai.crushai.dto.UserInfoDto;
-import com.crushai.crushai.service.UserProfileService;
+import com.crushai.crushai.service.UserService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -11,9 +11,9 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/profile")
 public class UserController {
 
-    private final UserProfileService userProfileService;
+    private final UserService userProfileService;
 
-    public UserController(UserProfileService userProfileService) {
+    public UserController(UserService userProfileService) {
         this.userProfileService = userProfileService;
     }
 

@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.time.LocalDate;
 
 @Entity
@@ -47,10 +48,12 @@ public class UserEntity {
     private String facebookId;
 
     @Column(nullable = false)
-    private Boolean onboardingCompleted = false;
+    private boolean onboardingCompleted = false;
 
     @Column(nullable = false)
-    private Boolean delYn = false;
+    private boolean delYn = false;
+
+    private Instant deletedAt;
 
     // 기본 생성자
     public UserEntity(String email, String password) {
@@ -143,7 +146,13 @@ public class UserEntity {
         }
     }
 
-    public void deleteUser() {
+    public void deleteUser(Instant deletedAt) {
         this.delYn = true;
+        this.deletedAt = deletedAt; // 30일 뒤
+    }
+
+    public void reactivateUser() {
+        this.delYn = false;
+        this.deletedAt = null;
     }
 }
