@@ -74,7 +74,7 @@ public class UserService {
 
     @Transactional
     public void deleteExpiredUsers(Instant now) {
-        List<UserEntity> usersToDelete = userRepository.findAllByDeletedTrueAndDeletedAtBefore(now);
+        List<UserEntity> usersToDelete = userRepository.findAllByDeletedAtTrueAndDeletedAtBefore(now);
         userRepository.deleteAll(usersToDelete);
     }
 

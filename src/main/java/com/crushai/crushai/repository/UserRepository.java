@@ -19,6 +19,6 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
 
     Optional<UserEntity> findByGoogleId(String googleId);
 
-    List<UserEntity> findAllByDeletedTrueAndDeletedAtBefore(Instant now);
+    List<UserEntity> findAllByDeletedAtTrueAndDeletedAtBefore(Instant now);
 
 }

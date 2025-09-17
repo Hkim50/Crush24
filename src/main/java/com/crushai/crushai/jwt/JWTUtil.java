@@ -8,11 +8,12 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Date;
 
 @Component
 public class JWTUtil {
-    private SecretKey secretKey;
+    private final SecretKey secretKey;
 
     public JWTUtil(@Value("${spring.jwt.secret}")String secret) {
         this.secretKey = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), Jwts.SIG.HS256.key().build().getAlgorithm());
@@ -39,16 +40,18 @@ public class JWTUtil {
     }
 
     public Boolean isExpired(String token) {
-        return getExpirationDate(token).before(new Date()); // 새로 만든 메서드 활용
+        // UTC 기준의 현재 시간과 비교하여 일관성을 유지합니다.
+        return getExpirationDate(token).before(Date.from(Instant.now()));
     }
 
     public String createJwt(String category, String username, String role, Long expiredMs) {
+        Instant now = Instant.now(); // UTC 기준 현재 시간
         return Jwts.builder()
                 .claim("category", category)
                 .claim("email", username)
                 .claim("role", role)
-                .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + expiredMs))
+                .issuedAt(Date.from(now)) // Instant를 Date로 변환하여 설정
+                .expiration(Date.from(now.plusMillis(expiredMs))) // Instant를 Date로 변환하여 설정
                 .signWith(secretKey)
                 .compact();
     }

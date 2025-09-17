@@ -59,11 +59,12 @@ public class TokenService {
 
         // 새로운 토큰 발급
         String newAccess = jwtUtil.createJwt("accessToken", username, role, 3600_000L);      // 1시간
-        String newRefresh = jwtUtil.createJwt("refreshToken", username, role, 14L * 24 * 3600_000L);  // 14일
+        long refreshExpirationMs = 14L * 24 * 3600_000L; // 14일 (밀리초)
+        String newRefresh = jwtUtil.createJwt("refreshToken", username, role, refreshExpirationMs);
 
         //Refresh 토큰 저장 DB에 기존의 Refresh 토큰 삭제 후 새 Refresh 토큰 저장
         repository.deleteByRefresh(refreshToken);
-        addRefreshEntity(username, newRefresh, 86400000L);
+        addRefreshEntity(username, newRefresh, refreshExpirationMs);
 
         Map<String, String> tokens = new HashMap<>();
         tokens.put("accessToken", newAccess);
@@ -73,7 +74,8 @@ public class TokenService {
     }
 
     private void addRefreshEntity(String username, String refresh, Long expiredMs) {
-        String expiresAt = Instant.now().plusSeconds(14 * 24 * 60 * 60).toString();
+        Instant expiresAtInstant = Instant.now().plusMillis(expiredMs);
+        String expiresAt = expiresAtInstant.toString();
         RefreshEntity refreshEntity = new RefreshEntity(username, refresh, expiresAt);
         repository.save(refreshEntity);
     }
