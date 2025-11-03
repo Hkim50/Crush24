@@ -49,6 +49,12 @@ dependencies {
 
 	implementation 'com.google.api-client:google-api-client:2.2.0'
 	implementation 'com.nimbusds:nimbus-jose-jwt:9.35'
+	
+	// WebClient for calling chat service
+	implementation 'org.springframework.boot:spring-boot-starter-webflux'
+	
+	// Pushy for APNs (iOS Push Notifications)
+	implementation 'com.eatthepath:pushy:0.15.4'
 }
 
 tasks.named('test') {
