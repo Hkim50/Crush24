@@ -54,6 +54,10 @@ public class UserEntity {
     private boolean delYn = false;
 
     private Instant deletedAt;
+    
+    // APNs device token for iOS push notifications
+    @Column(name = "apns_token")
+    private String apnsToken;
 
     // 기본 생성자
     public UserEntity(String email, String password) {
@@ -154,5 +158,9 @@ public class UserEntity {
     public void reactivateUser() {
         this.delYn = false;
         this.deletedAt = null;
+    }
+    
+    public void setApnsToken(String apnsToken) {
+        this.apnsToken = apnsToken;
     }
 }
