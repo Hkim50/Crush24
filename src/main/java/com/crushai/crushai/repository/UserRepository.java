@@ -19,6 +19,7 @@ public interface UserRepository extends JpaRepository<UserEntity, Long> {
 
     Optional<UserEntity> findByGoogleId(String googleId);
 
-    List<UserEntity> findAllByDeletedAtTrueAndDeletedAtBefore(Instant now);
+    // delYn이 true이고 deletedAt이 현재 시간보다 이전인 유저 조회
+    List<UserEntity> findAllByDelYnTrueAndDeletedAtBefore(Instant now);
 
 }
