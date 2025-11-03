@@ -15,6 +15,11 @@ public class CustomUserDetails implements UserDetails {
     public CustomUserDetails(UserEntity userEntity) {
         this.userEntity = userEntity;
     }
+    
+    // 추가: userId를 직접 가져올 수 있도록
+    public Long getUserId() {
+        return userEntity.getId();
+    }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

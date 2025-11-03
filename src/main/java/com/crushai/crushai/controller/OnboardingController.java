@@ -2,6 +2,7 @@ package com.crushai.crushai.controller;
 
 import com.crushai.crushai.dto.CustomUserDetails;
 import com.crushai.crushai.dto.UserInfoDto;
+import com.crushai.crushai.service.UserInfoService;
 import com.crushai.crushai.service.UserInfoServiceImpl;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -20,9 +21,9 @@ import java.util.List;
 @RequestMapping("/api")
 public class OnboardingController {
 
-    private final UserInfoServiceImpl userInfoService;
+    private final UserInfoService userInfoService;
 
-    public OnboardingController(UserInfoServiceImpl userInfoService) {
+    public OnboardingController(UserInfoService userInfoService) {
         this.userInfoService = userInfoService;
     }
 
