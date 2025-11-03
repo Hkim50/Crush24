@@ -17,7 +17,7 @@ public class RefreshTokenCleaner {
         this.refreshRepository = refreshRepository;
     }
 
-    @Scheduled(cron = "0 0 3 * * *") // 매일 새벽 3시에 실행
+    @Scheduled(cron = "0 0 3 * * *", zone = "UTC") // 매일 새벽 3시에 실행
     @Transactional
     public void cleanExpiredTokens() {
         log.info("Starting expired refresh token cleanup task.");
