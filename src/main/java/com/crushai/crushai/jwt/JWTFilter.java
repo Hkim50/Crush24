@@ -4,6 +4,7 @@ package com.crushai.crushai.jwt;
 import com.crushai.crushai.dto.CustomUserDetails;
 import com.crushai.crushai.entity.Role;
 import com.crushai.crushai.entity.UserEntity;
+import com.crushai.crushai.repository.UserRepository;
 import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -15,14 +16,16 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.io.PrintWriter;
+import java.util.Optional;
 
 public class JWTFilter extends OncePerRequestFilter {
 
     private final JWTUtil jwtUtil;
+    private final UserRepository userRepository;
 
-    public JWTFilter(JWTUtil jwtUtil) {
+    public JWTFilter(JWTUtil jwtUtil, UserRepository userRepository) {
         this.jwtUtil = jwtUtil;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -56,8 +59,15 @@ public class JWTFilter extends OncePerRequestFilter {
             role = role.substring(5);
         }
 
-        Role userRole = Role.valueOf(role);
-        UserEntity userEntity = new UserEntity(email, userRole);
+        // DB에서 실제 UserEntity 조회
+        Optional<UserEntity> userEntityOpt = userRepository.findByEmail(email);
+        
+        if (userEntityOpt.isEmpty()) {
+            sendJsonError(response, HttpServletResponse.SC_UNAUTHORIZED, "User not found");
+            return;
+        }
+        
+        UserEntity userEntity = userEntityOpt.get();
         CustomUserDetails customUserDetails = new CustomUserDetails(userEntity);
 
         Authentication authToken = new UsernamePasswordAuthenticationToken(
