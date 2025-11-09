@@ -22,12 +22,14 @@ public class ChatServiceClient {
     private String chatServiceUrl;
     
     /**
-     * 채팅방 생성 요청
+     * 채팅방 생성 요청 (UUID 지정)
      */
-    public String createChatRoom(Long user1Id, Long user2Id, Long matchId) {
-        log.info("Creating chat room for match: {}, users: {} <-> {}", matchId, user1Id, user2Id);
+    public String createChatRoomWithId(String chatRoomId, Long user1Id, Long user2Id, Long matchId) {
+        log.info("Creating chat room with ID: {}, match: {}, users: {} <-> {}", 
+                 chatRoomId, matchId, user1Id, user2Id);
         
         Map<String, Object> request = new HashMap<>();
+        request.put("chatRoomId", chatRoomId);  // UUID 전달
         request.put("user1Id", user1Id.toString());
         request.put("user2Id", user2Id.toString());
         request.put("matchId", matchId);
@@ -44,9 +46,9 @@ public class ChatServiceClient {
                 .timeout(Duration.ofSeconds(5))
                 .block();
             
-            if (response != null && response.getChatRoomId() != null) {
-                log.info("Chat room created successfully: {}", response.getChatRoomId());
-                return response.getChatRoomId();
+            if (response != null && response.getId() != null) {
+                log.info("Chat room created successfully: {}", response.getId());
+                return response.getId();
             }
             
             throw new RuntimeException("Chat room ID is null");
@@ -56,6 +58,7 @@ public class ChatServiceClient {
             throw new RuntimeException("Failed to create chat room: " + e.getMessage(), e);
         }
     }
+
     
     /**
      * 채팅 서버 응답 DTO
@@ -64,7 +67,12 @@ public class ChatServiceClient {
     @lombok.NoArgsConstructor
     @lombok.AllArgsConstructor
     public static class ChatRoomResponse {
-        private String chatRoomId;
-        private String message;
+        private String id;  // ChatRoom의 실제 필드명
+        private String user1Id;
+        private String user2Id;
+        private Long matchId;
+        private String matchType;
+        private String createdAt;
+        private Boolean isActive;
     }
 }
