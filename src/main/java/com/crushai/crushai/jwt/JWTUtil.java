@@ -31,6 +31,10 @@ public class JWTUtil {
         return Jwts.parser().verifyWith(secretKey).build().parseSignedClaims(token).getPayload().get("category", String.class);
     }
 
+    public Long getUserId(String token) {
+        return Jwts.parser().verifyWith(secretKey).build().parseSignedClaims(token).getPayload().get("userId", Long.class);
+    }
+
     // 만료일 Date 객체를 직접 반환하는 메서드 추가
     public Date getExpirationDate(String token) {
         if (token == null || token.trim().isEmpty()) {
@@ -44,12 +48,13 @@ public class JWTUtil {
         return getExpirationDate(token).before(Date.from(Instant.now()));
     }
 
-    public String createJwt(String category, String username, String role, Long expiredMs) {
+    public String createJwt(String category, String username, String role, Long userId, Long expiredMs) {
         Instant now = Instant.now(); // UTC 기준 현재 시간
         return Jwts.builder()
                 .claim("category", category)
                 .claim("email", username)
                 .claim("role", role)
+                .claim("userId", userId)  // ✅ userId 추가
                 .issuedAt(Date.from(now)) // Instant를 Date로 변환하여 설정
                 .expiration(Date.from(now.plusMillis(expiredMs))) // Instant를 Date로 변환하여 설정
                 .signWith(secretKey)

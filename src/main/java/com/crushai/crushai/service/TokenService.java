@@ -52,15 +52,16 @@ public class TokenService {
 
         String username = jwtUtil.getUsername(refreshToken);
         String role = jwtUtil.getRole(refreshToken);
+        Long userId = jwtUtil.getUserId(refreshToken);  // ✅ userId 추출
 
         if (role.startsWith("ROLE_")) {
             role = role.substring(5);
         }
 
         // 새로운 토큰 발급
-        String newAccess = jwtUtil.createJwt("accessToken", username, role, 3600_000L);      // 1시간
+        String newAccess = jwtUtil.createJwt("accessToken", username, role, userId, 3600_000L);      // 1시간
         long refreshExpirationMs = 14L * 24 * 3600_000L; // 14일 (밀리초)
-        String newRefresh = jwtUtil.createJwt("refreshToken", username, role, refreshExpirationMs);
+        String newRefresh = jwtUtil.createJwt("refreshToken", username, role, userId, refreshExpirationMs);
 
         //Refresh 토큰 저장 DB에 기존의 Refresh 토큰 삭제 후 새 Refresh 토큰 저장
         repository.deleteByRefresh(refreshToken);

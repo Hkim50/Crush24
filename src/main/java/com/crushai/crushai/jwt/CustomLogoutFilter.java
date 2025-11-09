@@ -51,6 +51,7 @@ public class CustomLogoutFilter extends GenericFilterBean {
         }
 
         // delete all refreshToken by user's email
+        // 유저 로그아웃 시 모든기기에서 로그아웃
         String userEmail = jwtUtil.getUsername(refresh);
         refreshRepository.deleteAllByEmail(userEmail);
 

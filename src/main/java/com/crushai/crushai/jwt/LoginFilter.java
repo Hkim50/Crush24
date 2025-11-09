@@ -65,17 +65,19 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
 
     @Override
     protected void successfulAuthentication(HttpServletRequest request, HttpServletResponse response, FilterChain chain, Authentication authentication) throws IOException, ServletException {
-        //유저 정보
-        String email = authentication.getName();
+        // CustomUserDetails에서 userId 추출
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        Long userId = userDetails.getUserId();
+        String email = userDetails.getUsername();
 
         Collection<? extends GrantedAuthority> authorities = authentication.getAuthorities();
         Iterator<? extends GrantedAuthority> iterator = authorities.iterator();
         GrantedAuthority auth = iterator.next();
         String role = auth.getAuthority();
 
-        //토큰 생성
-        String access = jwtUtil.createJwt("access", email, role, 600000L);
-        String refresh = jwtUtil.createJwt("refresh", email , role, 86400000L);
+        //토큰 생성 (userId 포함)
+        String access = jwtUtil.createJwt("access", email, role, userId, 600000L);
+        String refresh = jwtUtil.createJwt("refresh", email , role, userId, 86400000L);
 
         //응답 설정
         response.setHeader("access", access);

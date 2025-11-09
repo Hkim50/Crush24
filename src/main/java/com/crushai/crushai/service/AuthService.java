@@ -151,8 +151,8 @@ public class AuthService {
     }
 
     private Map<String, String> generateTokens(UserEntity user, boolean isReactivated) {
-        String access = jwtUtil.createJwt("accessToken", user.getEmail(), user.getRole().name(), 3600_000L); // 1시간
-        String refresh = jwtUtil.createJwt("refreshToken", user.getEmail(), user.getRole().name(), 14L * 24 * 3600_000L); // 14일
+        String access = jwtUtil.createJwt("accessToken", user.getEmail(), user.getRole().name(), user.getId(), 3600_000L); // 1시간
+        String refresh = jwtUtil.createJwt("refreshToken", user.getEmail(), user.getRole().name(), user.getId(), 14L * 24 * 3600_000L); // 14일
 
         String expiresAt = Instant.now().plusSeconds(14 * 24 * 60 * 60).toString();
 
