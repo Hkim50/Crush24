@@ -2,6 +2,7 @@ package com.crushai.crushai.service;
 
 import com.crushai.crushai.auth.AppleIdTokenValidator;
 import com.crushai.crushai.auth.GoogleIdTokenValidator;
+import com.crushai.crushai.entity.DeviceType;
 import com.crushai.crushai.entity.LoginType;
 import com.crushai.crushai.entity.RefreshEntity;
 import com.crushai.crushai.entity.Role;
@@ -48,7 +49,7 @@ public class AuthService {
         this.objectMapper = objectMapper;
     }
 
-    public Map<String, String> loginWithGoogle(String idToken) {
+    public Map<String, String> loginWithGoogle(String idToken, String deviceId, String deviceName) {
         var payload = googleValidator.verify(idToken);
         if (payload == null) {
             throw new RuntimeException("Invalid Google ID Token");
@@ -64,7 +65,6 @@ public class AuthService {
         boolean isReactivated = false;
         // 탈퇴 상태 확인 후 복구
         if (user.isDelYn()) {
-            // checkAndReactivateUser가 성공하면 true를 반환하도록 수정
             isReactivated = checkAndReactivateUser(user);
         }
 
@@ -73,10 +73,13 @@ public class AuthService {
             userRepository.save(user);
         }
  
-        return generateTokens(user, isReactivated);
+        return generateTokens(user, isReactivated, 
+            deviceId != null ? deviceId : "unknown-device",
+            DeviceType.IOS,
+            deviceName);
     }
 
-    public Map<String, String> loginWithApple(String identityToken, String clientId) {
+    public Map<String, String> loginWithApple(String identityToken, String clientId, String deviceId, String deviceName) {
         var claims = appleValidator.verify(identityToken, clientId);
         if (claims == null) {
             throw new RuntimeException("Invalid Apple ID Token");
@@ -101,10 +104,13 @@ public class AuthService {
             userRepository.save(user);
         }
  
-        return generateTokens(user, isReactivated);
+        return generateTokens(user, isReactivated,
+            deviceId != null ? deviceId : "unknown-device",
+            DeviceType.IOS,
+            deviceName);
     }
 
-    public Map<String, String> loginWithFacebook(String accessToken) {
+    public Map<String, String> loginWithFacebook(String accessToken, String deviceId, String deviceName) {
         try {
             String url = "/v20.0/me?fields=id,email&access_token=" + accessToken;
 
@@ -140,7 +146,10 @@ public class AuthService {
                 userRepository.save(user);
             }
  
-            return generateTokens(user, isReactivated);
+            return generateTokens(user, isReactivated,
+                deviceId != null ? deviceId : "unknown-device",
+                DeviceType.IOS,
+                deviceName);
 
         } catch (RestClientResponseException e) {
             String responseBody = e.getResponseBodyAsString();
@@ -150,23 +159,73 @@ public class AuthService {
         }
     }
 
-    private Map<String, String> generateTokens(UserEntity user, boolean isReactivated) {
-        String access = jwtUtil.createJwt("accessToken", user.getEmail(), user.getRole().name(), user.getId(), 3600_000L); // 1시간
-        String refresh = jwtUtil.createJwt("refreshToken", user.getEmail(), user.getRole().name(), user.getId(), 14L * 24 * 3600_000L); // 14일
+    /**
+     * 로그인 시 JWT 토큰 생성 및 Refresh Token 저장
+     * 
+     * @param user 로그인한 사용자
+     * @param isReactivated 복귀 유저 여부
+     * @param deviceId 디바이스 고유 ID
+     * @param deviceType 디바이스 타입
+     * @param deviceName 디바이스 이름
+     * @return access token, refresh token 포함된 Map
+     */
+    private Map<String, String> generateTokens(UserEntity user, boolean isReactivated, 
+                                               String deviceId, DeviceType deviceType, String deviceName) {
+        long accessExpirationMs = 3600_000L;  // 1시간
+        long refreshExpirationMs = 14L * 24 * 3600_000L; // 14일
+        
+        String accessToken = jwtUtil.createJwt("accessToken", user.getEmail(), 
+            user.getRole().name(), user.getId(), accessExpirationMs);
+        String refreshToken = jwtUtil.createJwt("refreshToken", user.getEmail(), 
+            user.getRole().name(), user.getId(), refreshExpirationMs);
 
-        String expiresAt = Instant.now().plusSeconds(14 * 24 * 60 * 60).toString();
-
-        refreshRepository.save(new RefreshEntity(user.getEmail(), refresh, expiresAt));
+        // Refresh Token 해시 저장
+        String tokenHash = hashToken(refreshToken);
+        Instant expiresAt = Instant.now().plusMillis(refreshExpirationMs);
+        
+        RefreshEntity refreshEntity = RefreshEntity.builder()
+            .user(user)
+            .tokenHash(tokenHash)
+            .deviceId(deviceId)
+            .deviceType(deviceType)
+            .deviceName(deviceName)
+            .expiresAt(expiresAt)
+            .lastUsedAt(Instant.now())
+            .build();
+        
+        refreshRepository.save(refreshEntity);
 
         Map<String, String> tokens = new HashMap<>();
-        tokens.put("accessToken", access);
-        tokens.put("refreshToken", refresh);
-        // 온보딩 체크
+        tokens.put("accessToken", accessToken);
+        tokens.put("refreshToken", refreshToken);
         tokens.put("onboardingCompleted", String.valueOf(user.isOnboardingCompleted()));
-        // 복귀 유저인지 여부를 응답에 추가
         tokens.put("isReactivated", String.valueOf(isReactivated));
-        System.out.println(tokens.toString());
+        
         return tokens;
+    }
+    
+    /**
+     * Refresh Token을 SHA-256으로 해시
+     */
+    private String hashToken(String token) {
+        try {
+            java.security.MessageDigest digest = 
+                java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+            return hexString.toString();
+            
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new RuntimeException("Failed to hash token", e);
+        }
     }
 
     private boolean checkAndReactivateUser(UserEntity user) {
