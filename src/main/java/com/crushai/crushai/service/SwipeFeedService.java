@@ -2,15 +2,11 @@ package com.crushai.crushai.service;
 
 import com.crushai.crushai.dto.SwipeCardDto;
 import com.crushai.crushai.dto.SwipeFeedResponse;
-import com.crushai.crushai.entity.Match;
 import com.crushai.crushai.entity.UserEntity;
 import com.crushai.crushai.entity.UserInfoEntity;
 import com.crushai.crushai.entity.UserSwipe;
 import com.crushai.crushai.enums.Gender;
-import com.crushai.crushai.repository.MatchRepository;
-import com.crushai.crushai.repository.UserLikeRepository;
-import com.crushai.crushai.repository.UserRepository;
-import com.crushai.crushai.repository.UserSwipeRepository;
+import com.crushai.crushai.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,13 +26,14 @@ public class SwipeFeedService {
     private final UserRepository userRepository;
     private final UserSwipeRepository swipeRepository;
     private final UserLikeRepository likeRepository;
-    private final MatchRepository matchRepository;
+    private final UserBlockRepository blockRepository;
     
     private static final int INITIAL_BATCH_SIZE = 15;
     private static final int REFILL_BATCH_SIZE = 10;
     
     /**
      * 초기 Swipe 피드 가져오기
+     * excludeUserIds 파라미터 제거 - 서버에서 자동 필터링
      */
     @Transactional(readOnly = true)
     public SwipeFeedResponse getInitialFeed(Long userId) {
@@ -45,7 +42,7 @@ public class SwipeFeedService {
         UserEntity currentUser = userRepository.findById(userId)
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
         
-        List<SwipeCardDto> cards = getRecommendedUsers(currentUser, INITIAL_BATCH_SIZE, Collections.emptyList());
+        List<SwipeCardDto> cards = getRecommendedUsers(currentUser, INITIAL_BATCH_SIZE);
         
         return SwipeFeedResponse.builder()
             .users(cards)
@@ -56,15 +53,16 @@ public class SwipeFeedService {
     
     /**
      * 추가 Swipe 피드 가져오기
+     * excludeUserIds 파라미터 제거 - 서버에서 자동 필터링
      */
     @Transactional(readOnly = true)
-    public SwipeFeedResponse getMoreFeed(Long userId, List<Long> excludeUserIds) {
-        log.info("Fetching more feed for user: {}, excluding: {} users", userId, excludeUserIds.size());
+    public SwipeFeedResponse getMoreFeed(Long userId) {
+        log.info("Fetching more feed for user: {}", userId);
         
         UserEntity currentUser = userRepository.findById(userId)
             .orElseThrow(() -> new IllegalArgumentException("User not found"));
         
-        List<SwipeCardDto> cards = getRecommendedUsers(currentUser, REFILL_BATCH_SIZE, excludeUserIds);
+        List<SwipeCardDto> cards = getRecommendedUsers(currentUser, REFILL_BATCH_SIZE);
         
         return SwipeFeedResponse.builder()
             .users(cards)
@@ -74,45 +72,43 @@ public class SwipeFeedService {
     }
     
     /**
-     * 추천 유저 찾기 (간단한 버전)
+     * 추천 유저 찾기 (개선 버전)
+     * 서버에서 모든 필터링 자동 수행
      */
-    private List<SwipeCardDto> getRecommendedUsers(
-        UserEntity currentUser, 
-        int limit,
-        List<Long> additionalExcludeIds
-    ) {
+    private List<SwipeCardDto> getRecommendedUsers(UserEntity currentUser, int limit) {
         Long userId = currentUser.getId();
         
-        // 1. 이미 스와이프한 유저들
+        // 1. 이미 스와이프한 유저들 (LIKE든 PASS든 모두 포함)
+        //    → 매칭된 유저도 여기 포함됨 (매칭 = 양방향 스와이프)
         Set<Long> swipedUserIds = swipeRepository
             .findAllByFromUserId(userId)
             .stream()
             .map(UserSwipe::getToUserId)
             .collect(Collectors.toSet());
         
-        // 2. 이미 매칭된 유저들
-        Set<Long> matchedUserIds = matchRepository
-            .findActiveMatchesByUserId(userId)
-            .stream()
-            .map(match -> match.getUser1Id().equals(userId) 
-                ? match.getUser2Id() 
-                : match.getUser1Id())
-            .collect(Collectors.toSet());
+        // 2. 내가 차단한 유저들
+        List<Long> blockedByMeIds = blockRepository.findBlockedUserIdsByBlockerId(userId);
         
-        // 3. 제외할 유저 통합
+        // 3. 나를 차단한 유저들
+        List<Long> blockedMeIds = blockRepository.findBlockerIdsByBlockedUserId(userId);
+        
+        // 4. 제외할 유저 통합
         Set<Long> excludedIds = new HashSet<>();
         excludedIds.add(userId); // 본인
-        excludedIds.addAll(swipedUserIds);
-        excludedIds.addAll(matchedUserIds);
-        excludedIds.addAll(additionalExcludeIds);
+        excludedIds.addAll(swipedUserIds); // 스와이프한 유저 (매칭된 유저 포함)
+        excludedIds.addAll(blockedByMeIds); // 차단한 유저
+        excludedIds.addAll(blockedMeIds); // 나를 차단한 유저
         
-        // 4. 선호 성별
+        log.info("Excluding {} users: {} swiped, {} blocked by me, {} blocked me",
+                excludedIds.size(), swipedUserIds.size(), blockedByMeIds.size(), blockedMeIds.size());
+        
+        // 5. 선호 성별
         UserInfoEntity currentUserInfo = currentUser.getUserInfo();
         List<Gender> preferredGenders = currentUserInfo != null && currentUserInfo.getShowMeGender() != null
             ? currentUserInfo.getShowMeGender()
             : Arrays.asList(Gender.values());
         
-        // 5. 후보 유저 찾기
+        // 6. 후보 유저 찾기 (TODO: 나중에 쿼리 최적화 필요)
         List<UserEntity> candidates = userRepository.findAll().stream()
             .filter(user -> !excludedIds.contains(user.getId()))
             .filter(UserEntity::isOnboardingCompleted)
@@ -121,21 +117,21 @@ public class SwipeFeedService {
             .filter(user -> preferredGenders.contains(user.getUserInfo().getGender()))
             .collect(Collectors.toList());
         
-        // 6. 랜덤 섞기
+        // 7. 랜덤 섞기
         Collections.shuffle(candidates);
         
-        // 7. 필요한 수만큼
+        // 8. 필요한 수만큼
         List<UserEntity> selectedUsers = candidates.stream()
             .limit(limit)
             .toList();
         
-        // 8. DTO 변환
+        // 9. DTO 변환
         List<SwipeCardDto> cards = selectedUsers.stream()
             .map(this::convertToSwipeCardDto)
             .collect(Collectors.toList());
         
-        // 9. 좋아요 상태 추가
-        enrichWithLikeStatus(userId, cards);
+        // 10. 좋아요 상태 추가
+//        enrichWithLikeStatus(userId, cards);
         
         return cards;
     }
@@ -160,34 +156,39 @@ public class SwipeFeedService {
             .age(age)
             .location(userInfo.getLocation())
             .photos(userInfo.getPhotoUrls())
-            .likedByThem(false)
             .build();
     }
     
     /**
-     * 각 유저가 현재 유저를 좋아요 했는지 확인
+     * 각 카드에 "상대방이 나를 좋아요 했는지" 상태 추가
+     * 
+     * 비즈니스 목적:
+     * - UI에서 "Likes you!" 배지 표시
+     * - 매칭 확률 증가 (상대가 이미 관심 있음)
+     * - 향후 프리미엄 기능 수익화 가능
+     * 
+     * 성능: IN 쿼리 1개로 배치 처리 (효율적)
      */
-    // 필요 없는 로직인것 같음.
-    private void enrichWithLikeStatus(Long currentUserId, List<SwipeCardDto> cards) {
-        if (cards.isEmpty()) return;
-        
-        List<Long> targetUserIds = cards.stream()
-            .map(SwipeCardDto::getUserId)
-            .collect(Collectors.toList());
-        
-        // 한 번의 쿼리로 모든 좋아요 정보 가져오기
-        Map<Long, Boolean> likeStatusMap = likeRepository
-            .findAllByFromUserIdInAndToUserId(targetUserIds, currentUserId)
-            .stream()
-            .collect(Collectors.toMap(
-                like -> like.getFromUserId(),
-                like -> true
-            ));
-        
-        // 각 카드에 좋아요 상태 설정
-        cards.forEach(card -> {
-            boolean isLikedByThem = likeStatusMap.getOrDefault(card.getUserId(), false);
-            card.setLikedByThem(isLikedByThem);
-        });
-    }
+//    private void enrichWithLikeStatus(Long currentUserId, List<SwipeCardDto> cards) {
+//        if (cards.isEmpty()) return;
+//
+//        List<Long> targetUserIds = cards.stream()
+//            .map(SwipeCardDto::getUserId)
+//            .collect(Collectors.toList());
+//
+//        // 한 번의 쿼리로 모든 좋아요 정보 가져오기
+//        Map<Long, Boolean> likeStatusMap = likeRepository
+//            .findAllByFromUserIdInAndToUserId(targetUserIds, currentUserId)
+//            .stream()
+//            .collect(Collectors.toMap(
+//                like -> like.getFromUserId(),
+//                like -> true
+//            ));
+//
+//        // 각 카드에 좋아요 상태 설정
+//        cards.forEach(card -> {
+//            boolean isLikedByThem = likeStatusMap.getOrDefault(card.getUserId(), false);
+//            card.setLikedByThem(isLikedByThem);
+//        });
+//    }
 }

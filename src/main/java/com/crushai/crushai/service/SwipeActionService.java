@@ -1,6 +1,7 @@
 package com.crushai.crushai.service;
 
 import com.crushai.crushai.client.ChatServiceClient;
+import com.crushai.crushai.dto.AsyncAction;
 import com.crushai.crushai.dto.MatchedUserDto;
 import com.crushai.crushai.dto.SwipeActionResponse;
 import com.crushai.crushai.entity.*;
@@ -9,10 +10,12 @@ import com.crushai.crushai.enums.SwipeType;
 import com.crushai.crushai.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -64,7 +67,105 @@ public class SwipeActionService {
             .message("Passed")
             .build();
     }
-    
+
+    /**
+     * @Async("swipeExecutor")를 통해 별도 스레드 풀에서 실행
+     * DB 쿼리를 최소화하여 성능 향상
+     */
+    @Async("swipeExecutor")
+    @Transactional
+    public void processAsyncSwipeBatch(List<AsyncAction> actions, Long userId) {
+        log.info("[ASYNC] Processing {} swipes for user {} in thread: {}", 
+                actions.size(), userId, Thread.currentThread().getName());
+        
+        try {
+            // 1. 사용자 정보 한 번만 조회 (10번 → 1번)
+            UserEntity fromUser = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+            
+            // 2. 대상 사용자들 한 번에 조회 (10번 → 1번)
+            List<Long> targetIds = actions.stream()
+                .map(AsyncAction::getTargetUserId)
+                .distinct()
+                .toList();
+            
+            List<UserEntity> targetUsers = userRepository.findAllById(targetIds);
+            
+            // 빠른 조회를 위한 Map 생성
+            Map<Long, UserEntity> targetUserMap = targetUsers.stream()
+                .collect(java.util.stream.Collectors.toMap(UserEntity::getId, user -> user));
+            
+            // 3. 이미 스와이프한 사용자 필터링 (10번 → 1번)
+            List<Long> existingSwipes = swipeRepository
+                .findByFromUserIdAndToUserIdIn(userId, targetIds)
+                .stream()
+                .map(UserSwipe::getToUserId)
+                .toList();
+            
+            int processedCount = 0;
+            int skippedCount = 0;
+            int matchCount = 0;
+            List<Long> failedTargets = new java.util.ArrayList<>();
+            
+            // 4. 각 액션 처리
+            for (AsyncAction action : actions) {
+                try {
+                    Long targetId = action.getTargetUserId();
+                    
+                    // 중복 체크
+                    if (existingSwipes.contains(targetId)) {
+                        log.debug("[ASYNC] Duplicate swipe ignored: {} -> {}", userId, targetId);
+                        skippedCount++;
+                        continue;
+                    }
+                    
+                    // 대상 사용자 찾기
+                    UserEntity toUser = targetUserMap.get(targetId);
+                    if (toUser == null) {
+                        log.warn("[ASYNC] Target user not found: {}", targetId);
+                        failedTargets.add(targetId);
+                        continue;
+                    }
+                    
+                    // Swipe 저장
+                    UserSwipe swipe = UserSwipe.builder()
+                        .fromUserId(userId)
+                        .toUserId(targetId)
+                        .swipeType(action.getAction())
+                        .build();
+                    swipeRepository.save(swipe);
+                    
+                    // LIKE 처리
+                    if (action.getAction() == SwipeType.LIKE) {
+                        SwipeActionResponse response = handleLike(fromUser, toUser);
+                        if (response.isMatch()) {
+                            matchCount++;
+                        }
+                    }
+                    
+                    processedCount++;
+                    
+                } catch (Exception e) {
+                    log.error("[ASYNC] Failed to process single swipe: {} -> {}", 
+                        userId, action.getTargetUserId(), e);
+                    failedTargets.add(action.getTargetUserId());
+                }
+            }
+            
+            // 5. 처리 결과 로깅
+            log.info("[ASYNC] Batch completed for user {}: processed={}, skipped={}, matches={}, failed={}", 
+                userId, processedCount, skippedCount, matchCount, failedTargets.size());
+            
+            if (!failedTargets.isEmpty()) {
+                log.warn("[ASYNC] Failed target IDs for user {}: {}", userId, failedTargets);
+            }
+            
+        } catch (Exception e) {
+            log.error("[ASYNC] Batch swipe processing failed for user {}", userId, e);
+            // TODO: 실패한 배치를 재시도 큐에 추가하거나 알림 발송
+        }
+    }
+
     /**
      * 좋아요 처리
      */
@@ -98,7 +199,6 @@ public class SwipeActionService {
         log.info("MATCH! {} <-> {}", fromUserId, toUserId);
         return createMatch(fromUser, toUser);
     }
-    
     /**
      * 매칭 생성
      */
@@ -106,38 +206,45 @@ public class SwipeActionService {
         Long currentUserId = currentUser.getId();
         Long matchedUserId = matchedUser.getId();
         
-        // 1. Match 엔티티 생성 (작은 ID를 user1으로)
+        // 1. 안전한 UUID 생성 (보안 강화)
+        String chatRoomId = java.util.UUID.randomUUID().toString();
+        
+        // 2. Match 엔티티 생성 (UUID 포함)
         Match match = Match.builder()
             .user1Id(Math.min(currentUserId, matchedUserId))
             .user2Id(Math.max(currentUserId, matchedUserId))
             .matchType(MatchType.SWIPE)
+            .chatRoomId(chatRoomId)  // UUID 미리 저장
             .isActive(true)
             .build();
         
         Match savedMatch = matchRepository.save(match);
-        log.info("Match created with ID: {}", savedMatch.getId());
+        log.info("Match created with ID: {}, chatRoomId: {}", savedMatch.getId(), chatRoomId);
         
-        // 2. 매칭 알림 발송 (양쪽 모두)
+        // 3. 매칭 알림 발송 (양쪽 모두)
         notificationService.sendMatchNotification(currentUser, matchedUser);
         notificationService.sendMatchNotification(matchedUser, currentUser);
         
-        // 3. 채팅방 생성 (비동기로 처리 - 실패해도 재시도 가능)
-        String chatRoomId = null;
+        // 4. 채팅방 생성 (UUID 전달)
         try {
-            chatRoomId = chatServiceClient.createChatRoom(
+            String createdChatRoomId = chatServiceClient.createChatRoomWithId(
+                chatRoomId,  // 지정한 UUID 전달
                 currentUserId,
                 matchedUserId,
                 savedMatch.getId()
             );
             
-            // 4. chatRoomId 업데이트
-            savedMatch.setChatRoomId(chatRoomId);
-            matchRepository.save(savedMatch);
+            log.info("Chat room created with UUID: {}", createdChatRoomId);
             
-            log.info("Chat room created: {}", chatRoomId);
+            // 검증: UUID가 일치하는지 확인
+            if (!chatRoomId.equals(createdChatRoomId)) {
+                log.warn("Chat room ID mismatch! Expected: {}, Actual: {}", chatRoomId, createdChatRoomId);
+            }
+            
         } catch (Exception e) {
             log.error("Failed to create chat room for match: {}", savedMatch.getId(), e);
             // 채팅방 생성 실패해도 매칭은 유지
+            // UUID가 이미 Match에 저장되어 있으므로 나중에 재시도 가능
             // TODO: 재시도 로직 추가 (배치 작업 등)
         }
         
@@ -151,7 +258,7 @@ public class SwipeActionService {
         
         return SwipeActionResponse.builder()
             .isMatch(true)
-            .chatRoomId(chatRoomId)
+            .chatRoomId(chatRoomId)  // UUID 반환
             .message("It's a match!")
             .matchedUser(MatchedUserDto.builder()
                 .userId(matchedUserId)

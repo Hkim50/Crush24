@@ -10,7 +10,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/swipe")
@@ -38,21 +39,18 @@ public class SwipeController {
 
     /**
      * 추가 Swipe 피드 가져오기
-     * POST /api/swipe/feed/more
+     * GET /api/swipe/feed/more
+     * 
+     * excludeUserIds 파라미터 제거 - 서버에서 자동 필터링
      */
-    @PostMapping("/feed/more")
+    @GetMapping("/feed/more")
     public ResponseEntity<SwipeFeedResponse> getMoreFeed(
-        @AuthenticationPrincipal CustomUserDetails userDetails,
-        @RequestBody @Valid MoreFeedRequest request
+        @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         Long userId = userDetails.getUserId();
-        log.info("User {} requesting more swipe feed, excluding {} users", 
-                 userId, request.getExcludeUserIds().size());
+        log.info("User {} requesting more swipe feed", userId);
         
-        SwipeFeedResponse response = swipeFeedService.getMoreFeed(
-            userId, 
-            request.getExcludeUserIds() != null ? request.getExcludeUserIds() : Collections.emptyList()
-        );
+        SwipeFeedResponse response = swipeFeedService.getMoreFeed(userId);
         return ResponseEntity.ok(response);
     }
 
@@ -77,4 +75,43 @@ public class SwipeController {
         
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * 비동기 Swipe 액션 배치 처리
+     * 앱에서 10개의 swipe 데이터가 쌓였을 때 한 번에 전송
+     * 
+     * POST /api/swipe/action/async
+     */
+    @PostMapping("/action/async")
+    public ResponseEntity<Map<String, Object>> processAsyncSwipes(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestBody @Valid List<AsyncAction> actions
+    ) {
+        Long userId = userDetails.getUserId();
+        
+        // 요청 검증
+        if (actions == null || actions.isEmpty()) {
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", "Actions list cannot be empty"));
+        }
+        
+        if (actions.size() > 20) {
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", "Cannot process more than 20 actions at once"));
+        }
+        
+        log.info("User {} submitted {} async swipes", userId, actions.size());
+
+        // @Async 메서드 호출 - Spring이 자동으로 별도 스레드에서 실행
+        swipeActionService.processAsyncSwipeBatch(actions, userId);
+
+        // 즉시 202 Accepted 응답
+        return ResponseEntity.accepted()
+            .body(Map.of(
+                "message", "Swipes are being processed",
+                "count", actions.size()
+            ));
+    }
+
+
 }
