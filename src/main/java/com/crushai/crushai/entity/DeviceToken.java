@@ -11,8 +11,8 @@ import java.time.Instant;
 @Entity
 @Table(name = "device_tokens", 
        indexes = {
-           @Index(name = "idx_user_id", columnList = "user_id"),
-           @Index(name = "idx_device_token", columnList = "device_token"),
+           @Index(name = "idx_userId", columnList = "userId"),
+           @Index(name = "idx_deviceToken", columnList = "deviceToken"),
            @Index(name = "idx_status", columnList = "status")
        })
 @Getter
@@ -29,7 +29,7 @@ public class DeviceToken {
     @Column(nullable = false)
     private Long userId;
     
-    @Column(nullable = false, unique = true, length = 200, name = "device_token")
+    @Column(nullable = false, unique = true, length = 200)
     private String deviceToken;
     
     @Enumerated(EnumType.STRING)
@@ -50,25 +50,22 @@ public class DeviceToken {
     @Column(length = 50)
     private String appVersion;
     
-    @Column(name = "last_used_at")
     private Instant lastUsedAt;
     
-    @Column(name = "expires_at")
     private Instant expiresAt;
     
-    @Column(columnDefinition = "TEXT", name = "failure_reason")
+    @Column(columnDefinition = "TEXT")
     private String failureReason;
     
-    @Column(name = "failure_count")
     @Builder.Default
     private Integer failureCount = 0;
     
     @CreatedDate
-    @Column(nullable = false, updatable = false, name = "created_at")
+    @Column(nullable = false, updatable = false)
     private Instant createdAt;
     
     @LastModifiedDate
-    @Column(nullable = false, name = "updated_at")
+    @Column(nullable = false)
     private Instant updatedAt;
     
     /**

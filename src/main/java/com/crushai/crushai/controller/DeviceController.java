@@ -26,13 +26,24 @@ public class DeviceController {
     /**
      * APNs 디바이스 토큰 등록
      * 
+     * iOS 앱에서 APNs 토큰을 받으면 즉시 호출해야 함
+     * - 앱 첫 실행 시
+     * - 로그인 성공 시
+     * - 토큰이 갱신되었을 때
+     * 
      * @param userDetails 인증된 사용자 정보
-     * @param request APNs 토큰 요청 DTO
+     * @param request APNs 토큰 요청 DTO (deviceToken 필수, 나머지 선택)
      * @return 등록 결과
      * 
      * POST /api/device/apns-token
-     * Request Body: { "deviceToken": "abc123..." }
-     * Response: { "message": "Device token registered", "success": true }
+     * Request Body: 
+     * {
+     *   "deviceToken": "abc123...",
+     *   "deviceModel": "iPhone 14 Pro",  // 선택
+     *   "osVersion": "iOS 17.2",          // 선택
+     *   "appVersion": "1.0.5"             // 선택
+     * }
+     * Response: { "message": "Device token registered successfully", "success": true }
      */
     @PostMapping("/apns-token")
     public ResponseEntity<DeviceTokenResponse> registerApnsToken(
@@ -42,7 +53,16 @@ public class DeviceController {
         Long userId = userDetails.getUserId();
         
         try {
-            deviceService.registerApnsToken(userId, request.getDeviceToken());
+            deviceService.registerApnsToken(
+                userId, 
+                request.getDeviceToken(),
+                request.getDeviceModel(),
+                request.getOsVersion(),
+                request.getAppVersion()
+            );
+            
+            log.info("APNs token registered for user: {}", userId);
+            
             return ResponseEntity.ok(
                 DeviceTokenResponse.success("Device token registered successfully")
             );
@@ -67,7 +87,7 @@ public class DeviceController {
      * @return 삭제 결과
      * 
      * DELETE /api/device/apns-token
-     * Response: { "message": "Device token removed", "success": true }
+     * Response: { "message": "Device token removed successfully", "success": true }
      */
     @DeleteMapping("/apns-token")
     public ResponseEntity<DeviceTokenResponse> removeApnsToken(
@@ -76,19 +96,22 @@ public class DeviceController {
         Long userId = userDetails.getUserId();
         
         try {
-            deviceService.removeApnsToken(userId);
+            deviceService.deactivateAllUserTokens(userId);
+            
+            log.info("All APNs tokens removed for user: {}", userId);
+            
             return ResponseEntity.ok(
-                DeviceTokenResponse.success("Device token removed successfully")
+                DeviceTokenResponse.success("All device tokens removed successfully")
             );
         } catch (IllegalArgumentException e) {
-            log.error("Failed to remove APNs token for user {}: {}", userId, e.getMessage());
+            log.error("Failed to remove APNs tokens for user {}: {}", userId, e.getMessage());
             return ResponseEntity.badRequest().body(
                 DeviceTokenResponse.error(e.getMessage())
             );
         } catch (Exception e) {
-            log.error("Unexpected error while removing APNs token for user {}", userId, e);
+            log.error("Unexpected error while removing APNs tokens for user {}", userId, e);
             return ResponseEntity.internalServerError().body(
-                DeviceTokenResponse.error("Failed to remove device token")
+                DeviceTokenResponse.error("Failed to remove device tokens")
             );
         }
     }
@@ -100,7 +123,7 @@ public class DeviceController {
      * @return 토큰 존재 여부
      * 
      * GET /api/device/apns-token/status
-     * Response: { "message": "Token exists", "success": true }
+     * Response: { "message": "Active tokens found", "success": true }
      */
     @GetMapping("/apns-token/status")
     public ResponseEntity<DeviceTokenResponse> checkApnsTokenStatus(
@@ -109,15 +132,15 @@ public class DeviceController {
         Long userId = userDetails.getUserId();
         
         try {
-            boolean hasToken = deviceService.hasApnsToken(userId);
+            boolean hasTokens = deviceService.hasActiveTokens(userId);
             
-            if (hasToken) {
+            if (hasTokens) {
                 return ResponseEntity.ok(
-                    DeviceTokenResponse.success("Device token exists")
+                    DeviceTokenResponse.success("Active device tokens found")
                 );
             } else {
                 return ResponseEntity.ok(
-                    DeviceTokenResponse.success("No device token registered")
+                    DeviceTokenResponse.success("No active device tokens")
                 );
             }
         } catch (IllegalArgumentException e) {

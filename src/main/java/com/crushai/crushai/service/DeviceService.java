@@ -1,11 +1,18 @@
 package com.crushai.crushai.service;
 
-import com.crushai.crushai.entity.UserEntity;
+import com.crushai.crushai.entity.DeviceToken;
+import com.crushai.crushai.entity.DeviceType;
+import com.crushai.crushai.entity.TokenStatus;
+import com.crushai.crushai.repository.DeviceTokenRepository;
 import com.crushai.crushai.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * 디바이스 토큰 관리 서비스
@@ -16,75 +23,154 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class DeviceService {
     
+    private final DeviceTokenRepository deviceTokenRepository;
     private final UserRepository userRepository;
     
     /**
-     * APNs 디바이스 토큰 등록
-     * 
-     * @param userId 사용자 ID
-     * @param deviceToken APNs 디바이스 토큰
+     * APNs 토큰 등록 (멱등성 보장)
      */
     @Transactional
-    public void registerApnsToken(Long userId, String deviceToken) {
+    public void registerApnsToken(Long userId, String deviceToken, 
+                                   String deviceModel, String osVersion, String appVersion) {
         log.info("Registering APNs token for user: {}", userId);
         
-        UserEntity user = userRepository.findById(userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
+        // 사용자 존재 확인
+        if (!userRepository.existsById(userId)) {
+            throw new IllegalArgumentException("User not found: " + userId);
+        }
         
-        // 토큰 업데이트
-        user.setApnsToken(deviceToken);
+        // 토큰 정규화 (공백 제거)
+        String normalizedToken = deviceToken.replaceAll("\\s+", "");
         
-        // 더티 체킹으로 자동 저장됨 (save 불필요)
+        // 이미 존재하는 토큰인지 확인
+        Optional<DeviceToken> existing = deviceTokenRepository.findByDeviceToken(normalizedToken);
         
-        log.info("APNs token registered successfully for user: {}", userId);
+        if (existing.isPresent()) {
+            DeviceToken token = existing.get();
+            
+            // 다른 사용자의 토큰이면 해당 사용자의 토큰으로 이전
+            if (!token.getUserId().equals(userId)) {
+                log.info("Token ownership changed: {} -> {}", token.getUserId(), userId);
+                token.expire(); // 기존 토큰 만료
+                
+                // 새 토큰 생성
+                createNewToken(userId, normalizedToken, deviceModel, osVersion, appVersion);
+            } else {
+                // 같은 사용자의 토큰이면 재활성화
+                token.activate();
+                token.updateDeviceInfo(deviceModel, osVersion, appVersion);
+                log.info("Token reactivated for user: {}", userId);
+            }
+        } else {
+            // 새 토큰 생성
+            createNewToken(userId, normalizedToken, deviceModel, osVersion, appVersion);
+        }
     }
     
     /**
-     * APNs 디바이스 토큰 삭제
-     * 로그아웃 시 호출
-     * 
-     * @param userId 사용자 ID
+     * 새 토큰 생성
+     */
+    private void createNewToken(Long userId, String deviceToken,
+                                String deviceModel, String osVersion, String appVersion) {
+        DeviceToken newToken = DeviceToken.builder()
+            .userId(userId)
+            .deviceToken(deviceToken)
+            .deviceType(DeviceType.IOS)
+            .status(TokenStatus.ACTIVE)
+            .deviceModel(deviceModel)
+            .osVersion(osVersion)
+            .appVersion(appVersion)
+            .lastUsedAt(Instant.now())
+            .failureCount(0)
+            .build();
+        
+        deviceTokenRepository.save(newToken);
+        log.info("New token created for user: {}", userId);
+    }
+    
+    /**
+     * 로그아웃 시 특정 토큰 비활성화
      */
     @Transactional
-    public void removeApnsToken(Long userId) {
-        log.info("Removing APNs token for user: {}", userId);
+    public void deactivateToken(Long userId, String deviceToken) {
+        String normalizedToken = deviceToken.replaceAll("\\s+", "");
         
-        UserEntity user = userRepository.findById(userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
-        
-        // 토큰 제거
-        user.setApnsToken(null);
-        
-        // 더티 체킹으로 자동 저장됨 (save 불필요)
-        
-        log.info("APNs token removed successfully for user: {}", userId);
+        deviceTokenRepository.findByDeviceToken(normalizedToken)
+            .ifPresent(token -> {
+                if (token.getUserId().equals(userId)) {
+                    token.expire();
+                    log.info("Token deactivated for user: {}", userId);
+                }
+            });
     }
     
     /**
-     * 사용자의 APNs 토큰 조회
-     * 
-     * @param userId 사용자 ID
-     * @return APNs 토큰 (없으면 null)
+     * 사용자의 모든 토큰 비활성화
      */
-    @Transactional(readOnly = true)
-    public String getApnsToken(Long userId) {
-        UserEntity user = userRepository.findById(userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
+    @Transactional
+    public void deactivateAllUserTokens(Long userId) {
+        List<DeviceToken> tokens = deviceTokenRepository.findByUserIdAndStatus(
+            userId, TokenStatus.ACTIVE
+        );
         
-        return user.getApnsToken();
+        tokens.forEach(DeviceToken::expire);
+        log.info("Deactivated {} tokens for user: {}", tokens.size(), userId);
     }
     
     /**
-     * APNs 토큰 존재 여부 확인
-     * 
-     * @param userId 사용자 ID
-     * @return 토큰 존재 여부
+     * 사용자의 활성 토큰 조회 (푸시 전송용)
      */
     @Transactional(readOnly = true)
-    public boolean hasApnsToken(Long userId) {
-        UserEntity user = userRepository.findById(userId)
-            .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
+    public List<String> getActiveTokens(Long userId) {
+        return deviceTokenRepository.findByUserIdAndStatus(userId, TokenStatus.ACTIVE)
+            .stream()
+            .map(DeviceToken::getDeviceToken)
+            .toList();
+    }
+    
+    /**
+     * 토큰 실패 기록
+     */
+    @Transactional
+    public void recordTokenFailure(String deviceToken, String reason) {
+        String normalizedToken = deviceToken.replaceAll("\\s+", "");
         
-        return user.getApnsToken() != null && !user.getApnsToken().isEmpty();
+        deviceTokenRepository.findByDeviceToken(normalizedToken)
+            .ifPresent(token -> {
+                token.recordFailure(reason);
+                log.warn("Token failure recorded: {} - {}", maskToken(normalizedToken), reason);
+            });
+    }
+    
+    /**
+     * 토큰 사용 성공 기록
+     */
+    @Transactional
+    public void recordTokenSuccess(String deviceToken) {
+        String normalizedToken = deviceToken.replaceAll("\\s+", "");
+        
+        deviceTokenRepository.findByDeviceToken(normalizedToken)
+            .ifPresent(token -> {
+                token.markAsUsed();
+                log.debug("Token success recorded: {}", maskToken(normalizedToken));
+            });
+    }
+    
+    /**
+     * 사용자의 활성 토큰 존재 여부
+     */
+    @Transactional(readOnly = true)
+    public boolean hasActiveTokens(Long userId) {
+        return deviceTokenRepository.countByUserIdAndStatus(userId, TokenStatus.ACTIVE) > 0;
+    }
+    
+    /**
+     * 토큰 마스킹 (로그용)
+     */
+    private String maskToken(String token) {
+        if (token == null || token.length() <= 8) {
+            return "***";
+        }
+        return token.substring(0, 4) + "..." + token.substring(token.length() - 4);
     }
 }
