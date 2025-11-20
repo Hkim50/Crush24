@@ -36,10 +36,10 @@ public class UserService {
         this.userLikeRepository = userLikeRepository;
     }
 
-    public UserInfoDto getUser(String email) {
+    public UserInfoDto getUser(Long userId) {
         // 1. Find the user by email. If not found, throw an exception.
-        UserEntity user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with userId: " + userId));
 
         // 2. Get the associated UserInfo. If the user hasn't completed onboarding, this will be null.
         UserInfoEntity userInfo = user.getUserInfo();
@@ -73,13 +73,13 @@ public class UserService {
     }
 
     @Transactional
-    public void deleteUser(String email) {
+    public void deleteUser(Long userId) {
         // 1. 이메일로 유저를 찾습니다. 없으면 예외를 발생시킵니다.
-        UserEntity user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + userId));
 
         // 2. 해당 유저의 모든 리프레시 토큰을 삭제합니다.
-        refreshRepository.deleteAllByEmail(email);
+        refreshRepository.deleteAllByUser_Id(userId);
 
         // 3. 유저의 delYn 플래그를 true로 변경합니다.
         user.deleteUser(Instant.now().plus(30, ChronoUnit.DAYS));
@@ -112,8 +112,11 @@ public class UserService {
         
         // 3. UserLikes 삭제 (CASCADE로 처리되지 않으므로 수동 삭제)
         cleanupUserLikes(userIdsToDelete);
+
+        // 4. RefreshToken 삭제 (현재 유저 관련된 모든 RefreshToken 삭제)
+        cleanupUserRefreshTokens(userIdsToDelete);
         
-        // 4. User 삭제 (UserInfo는 CASCADE로 자동 삭제)
+        // 5. User 삭제 (UserInfo는 CASCADE로 자동 삭제)
         userRepository.deleteAll(usersToDelete);
 
         // TODO
@@ -190,5 +193,15 @@ public class UserService {
         }
         
         log.info("UserLikes 정리 완료");
+    }
+
+    private void cleanupUserRefreshTokens(List<Long> userIdsToDelete) {
+        for (Long userId : userIdsToDelete) {
+            refreshRepository.deleteAllByUser_Id(userId);
+
+            log.debug("User {} refresh token deleted", userId);
+        }
+
+        log.info("User Refresh Tokens 정리 완료");
     }
 }
