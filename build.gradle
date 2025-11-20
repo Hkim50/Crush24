@@ -55,6 +55,9 @@ dependencies {
 	
 	// Pushy for APNs (iOS Push Notifications)
 	implementation 'com.eatthepath:pushy:0.15.4'
+
+    // Redis for storing user's location
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 }
 
 tasks.named('test') {
