@@ -34,7 +34,8 @@ public class UserInfoEntity {
     @Enumerated(EnumType.STRING)
     private Gender gender;
 
-    private String location;
+    // ⚠️ location 필드 제거됨 (Redis Geo로 위치 관리)
+    // 위치 정보는 UserLocationService를 통해 Redis에서 관리
 
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "user_info_show_me_genders", joinColumns = @JoinColumn(name = "user_info_id"))
@@ -49,11 +50,10 @@ public class UserInfoEntity {
     private List<String> photoUrls;
 
     @Builder
-    public UserInfoEntity(String nickname, Date birthDate, Gender gender, String location, List<Gender> showMeGender, List<String> photoUrls) {
+    public UserInfoEntity(String nickname, Date birthDate, Gender gender, List<Gender> showMeGender, List<String> photoUrls) {
         this.nickname = nickname;
         this.birthDate = birthDate;
         this.gender = gender;
-        this.location = location;
         this.showMeGender = showMeGender;
         this.photoUrls = photoUrls;
     }
@@ -64,25 +64,40 @@ public class UserInfoEntity {
                 .nickname(dto.getName())
                 .birthDate(dto.getBirthDate())
                 .gender(dto.getGender())
-                .location(dto.getLocation())
                 .showMeGender(dto.getShowMeGender())
                 .photoUrls(photoPaths)
                 .build();
     }
 
     public UserInfoDto toDto() {
-        return new UserInfoDto(this.nickname, this.birthDate, this.gender, this.location, this.showMeGender, this.photoUrls);
+        return new UserInfoDto(this.nickname, this.birthDate, this.gender, this.showMeGender, this.photoUrls);
     }
 
     public void updateProfile(UserInfoDto dto) {
         if (dto.getName() != null) this.nickname = dto.getName();
         if (dto.getGender() != null) this.gender = dto.getGender();
-        if (dto.getLocation() != null) this.location = dto.getLocation();
         if (dto.getShowMeGender() != null) this.showMeGender = dto.getShowMeGender();
         if (dto.getPhotos() != null) this.photoUrls = dto.getPhotos();
     }
 
     public void setUser(UserEntity user) {
         this.user = user;
+    }
+    
+    /**
+     * 나이 계산 (만 나이)
+     */
+    public int getAge() {
+        if (birthDate == null) {
+            return 0;
+        }
+        
+        LocalDate birth = birthDate.toInstant()
+            .atZone(ZoneId.systemDefault())
+            .toLocalDate();
+        LocalDate now = LocalDate.now();
+        
+        return now.getYear() - birth.getYear() - 
+               (now.getDayOfYear() < birth.getDayOfYear() ? 1 : 0);
     }
 }

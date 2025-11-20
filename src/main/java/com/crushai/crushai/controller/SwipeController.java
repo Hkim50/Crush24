@@ -23,34 +23,44 @@ public class SwipeController {
     private final SwipeActionService swipeActionService;
 
     /**
-     * 초기 Swipe 피드 가져오기
-     * GET /api/swipe/feed
+     * 초기 Swipe 피드 가져오기 (필터 적용)
+     * POST /api/swipe/feed
+     * 
+     * Request Body:
+     * {
+     *   "minAge": 20,
+     *   "maxAge": 25,
+     *   "minDistanceKm": 1.0,
+     *   "maxDistanceKm": 20.0
+     * }
      */
-    @GetMapping("/feed")
+    @PostMapping("/feed")
     public ResponseEntity<SwipeFeedResponse> getInitialFeed(
-        @AuthenticationPrincipal CustomUserDetails userDetails
+        @AuthenticationPrincipal CustomUserDetails userDetails,
+        @RequestBody @Valid SwipeFeedFilterRequest filter
     ) {
         Long userId = userDetails.getUserId();
-        log.info("User {} requesting initial swipe feed", userId);
+        log.info("User {} requesting initial swipe feed with filter", userId);
         
-        SwipeFeedResponse response = swipeFeedService.getInitialFeed(userId);
+        filter.validate();
+        SwipeFeedResponse response = swipeFeedService.getInitialFeed(userId, filter);
         return ResponseEntity.ok(response);
     }
 
     /**
-     * 추가 Swipe 피드 가져오기
-     * GET /api/swipe/feed/more
-     * 
-     * excludeUserIds 파라미터 제거 - 서버에서 자동 필터링
+     * 추가 Swipe 피드 가져오기 (필터 적용)
+     * POST /api/swipe/feed/more
      */
-    @GetMapping("/feed/more")
+    @PostMapping("/feed/more")
     public ResponseEntity<SwipeFeedResponse> getMoreFeed(
-        @AuthenticationPrincipal CustomUserDetails userDetails
+        @AuthenticationPrincipal CustomUserDetails userDetails,
+        @RequestBody @Valid SwipeFeedFilterRequest filter
     ) {
         Long userId = userDetails.getUserId();
-        log.info("User {} requesting more swipe feed", userId);
+        log.info("User {} requesting more swipe feed with filter", userId);
         
-        SwipeFeedResponse response = swipeFeedService.getMoreFeed(userId);
+        filter.validate();
+        SwipeFeedResponse response = swipeFeedService.getMoreFeed(userId, filter);
         return ResponseEntity.ok(response);
     }
 

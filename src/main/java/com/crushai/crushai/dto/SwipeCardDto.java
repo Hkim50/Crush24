@@ -15,7 +15,18 @@ public class SwipeCardDto {
     private Long userId;
     private String nickname;
     private Integer age;
-    private String location;
+    private Double distanceKm;  // Redis Geo에서 계산된 거리 (km)
     private List<String> photos;
-    private Boolean likedByThem;  // 이 유저가 나를 좋아요 했는지
+//    private Boolean likedByThem;  // 이 유저가 나를 좋아요 했는지
+    
+    /**
+     * 거리 포맷팅 (UI 표시용)
+     * 예: "1.2 km", "5.0 km"
+     */
+    public String getFormattedDistance() {
+        if (distanceKm == null) {
+            return "Unknown";
+        }
+        return String.format("%.1f km", distanceKm);
+    }
 }
