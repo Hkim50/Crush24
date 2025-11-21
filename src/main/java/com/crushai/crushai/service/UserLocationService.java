@@ -1,6 +1,7 @@
 package com.crushai.crushai.service;
 
 import com.crushai.crushai.dto.NearbyUserDto;
+import com.crushai.crushai.repository.UserInfoRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.geo.*;
@@ -16,16 +17,29 @@ import java.util.List;
 public class UserLocationService {
 
     private final RedisTemplate<String, String> redisTemplate;
+    private final GeocodingService geocodingService;
+    private final UserInfoRepository userInfoRepository;
 
     private static final String USER_LOCATION_KEY = "user_locations";
-    private static final int DEFAULT_SEARCH_LIMIT = 100; // 최대 검색 결과 개수
+    private static final int DEFAULT_SEARCH_LIMIT = 100;
+    private static final double LOCATION_NAME_UPDATE_THRESHOLD_KM = 15.0; // 15km
 
-    public UserLocationService(@Qualifier("geoRedisTemplate") RedisTemplate<String, String> redisTemplate) {
+    public UserLocationService(
+            @Qualifier("geoRedisTemplate") RedisTemplate<String, String> redisTemplate,
+            GeocodingService geocodingService,
+            UserInfoRepository userInfoRepository) {
         this.redisTemplate = redisTemplate;
+        this.geocodingService = geocodingService;
+        this.userInfoRepository = userInfoRepository;
     }
 
     /**
-     * 유저 위치 저장 (동일 userId이면 업데이트)
+     * 유저 위치 저장 및 위치명 업데이트
+     * 
+     * 1. Redis에서 기존 위치 조회
+     * 2. 거리 계산 (기존 vs 새 위치)
+     * 3. Redis 좌표 업데이트 (항상)
+     * 4. 15km 이상 차이나면 locationName 업데이트 (캐시 확인 → API 호출)
      * 
      * @param userId 사용자 ID
      * @param longitude 경도 (-180 ~ 180)
@@ -37,15 +51,16 @@ public class UserLocationService {
             GeoOperations<String, String> geoOps = redisTemplate.opsForGeo();
             String memberName = "user:" + userId;
 
-            // Redis GEOADD (이미 있으면 자동 업데이트)
+            // 1. 기존 위치 조회
+            Point oldLocation = getUserLocation(userId);
+
+            // 2. Redis 좌표 업데이트 (항상)
             Long result = geoOps.add(
                     USER_LOCATION_KEY,
                     new Point(longitude, latitude),
                     memberName
             );
 
-            // result: null이 아니면 성공
-            // 1 = 새로 추가, 0 = 업데이트
             if (result != null) {
                 log.info("User location saved: userId={}, lon={}, lat={}, isNew={}", 
                     userId, longitude, latitude, result == 1);
@@ -54,10 +69,81 @@ public class UserLocationService {
                 throw new RuntimeException("Failed to save user location");
             }
 
+            // 3. 15km 이상 이동 시 locationName 업데이트
+            if (oldLocation != null) {
+                double distance = calculateDistance(
+                    oldLocation.getY(), oldLocation.getX(),
+                    latitude, longitude
+                );
+                
+                log.debug("Location distance for userId {}: {}km", userId, distance);
+                
+                if (distance >= LOCATION_NAME_UPDATE_THRESHOLD_KM) {
+                    updateLocationName(userId, latitude, longitude);
+                }
+            } else {
+                // 첫 위치 저장 시 locationName 업데이트
+                updateLocationName(userId, latitude, longitude);
+            }
+
         } catch (Exception e) {
             log.error("Error saving user location for userId: {}", userId, e);
             throw new RuntimeException("Failed to save user location: " + e.getMessage(), e);
         }
+    }
+    
+    /**
+     * 사용자의 위치명 업데이트 (캐싱 활용)
+     * 
+     * @param userId 사용자 ID
+     * @param latitude 위도
+     * @param longitude 경도
+     */
+    private void updateLocationName(Long userId, double latitude, double longitude) {
+        try {
+            // GeocodingService를 통해 위치명 조회 (캐싱 포함)
+            String locationName = geocodingService.getLocationName(latitude, longitude);
+            
+            if (locationName != null) {
+                // DB 업데이트
+                userInfoRepository.findById(userId).ifPresent(userInfo -> {
+                    userInfo.updateLocationName(locationName);
+                    // maybe unnecessary since it checks for dirty check
+                    userInfoRepository.save(userInfo);
+                    log.info("Location name updated: userId={}, locationName={}", userId, locationName);
+                });
+            } else {
+                log.warn("Failed to get location name for userId: {}", userId);
+            }
+            
+        } catch (Exception e) {
+            log.error("Error updating location name for userId: {}", userId, e);
+            // locationName 업데이트 실패는 치명적이지 않으므로 예외를 던지지 않음
+        }
+    }
+    
+    /**
+     * 두 좌표 사이의 거리 계산 (Haversine Formula)
+     * 
+     * @param lat1 위도1
+     * @param lon1 경도1
+     * @param lat2 위도2
+     * @param lon2 경도2
+     * @return 거리 (km)
+     */
+    private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+        final int EARTH_RADIUS_KM = 6371;
+        
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        
+        return EARTH_RADIUS_KM * c;
     }
 
     /**

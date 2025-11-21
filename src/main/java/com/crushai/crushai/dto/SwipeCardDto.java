@@ -16,6 +16,7 @@ public class SwipeCardDto {
     private String nickname;
     private Integer age;
     private Double distanceKm;  // Redis Geo에서 계산된 거리 (km)
+    private String locationName;  // 위치명 (예: "Los Angeles, CA")
     private List<String> photos;
 //    private Boolean likedByThem;  // 이 유저가 나를 좋아요 했는지
     

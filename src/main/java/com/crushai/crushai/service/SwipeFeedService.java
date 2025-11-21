@@ -121,16 +121,17 @@ public class SwipeFeedService {
         );
         
         // 거리 필터링 (minDistance 이상)
+        // 필요 없을 수도?
         Map<Long, Double> nearbyUserDistances = nearbyUsers.stream()
-            .filter(dto -> dto.distanceKm() >= filter.getMinDistanceKm())
+//            .filter(dto -> dto.distanceKm() >= filter.getMinDistanceKm())
             .collect(Collectors.toMap(
                 NearbyUserDto::userId,
                 NearbyUserDto::distanceKm
             ));
         
-        log.info("Found {} users within distance range {}~{}km", 
+        log.info("Found {} users within distance range {}~{}km",
                 nearbyUserDistances.size(), filter.getMinDistanceKm(), filter.getMaxDistanceKm());
-        
+
         // 6. DB에서 후보 유저 조회 (거리 필터 통과한 유저만)
         if (nearbyUserDistances.isEmpty()) {
             log.info("No users found in distance range");
@@ -168,7 +169,7 @@ public class SwipeFeedService {
     }
     
     /**
-     * Entity를 DTO로 변환 (거리 정보 포함)
+     * Entity를 DTO로 변환 (거리 정보 및 위치명 포함)
      */
     private SwipeCardDto convertToSwipeCardDto(UserEntity user, Double distanceKm) {
         UserInfoEntity userInfo = user.getUserInfo();
@@ -178,6 +179,7 @@ public class SwipeFeedService {
             .nickname(userInfo.getNickname())
             .age(userInfo.getAge())
             .distanceKm(distanceKm)
+            .locationName(userInfo.getLocationName())
             .photos(userInfo.getPhotoUrls())
             .build();
     }

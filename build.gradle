@@ -58,6 +58,9 @@ dependencies {
 
     // Redis for storing user's location
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    
+    // Guava for RateLimiter
+    implementation 'com.google.guava:guava:32.1.3-jre'
 }
 
 tasks.named('test') {

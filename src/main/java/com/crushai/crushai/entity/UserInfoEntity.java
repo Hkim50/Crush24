@@ -34,8 +34,11 @@ public class UserInfoEntity {
     @Enumerated(EnumType.STRING)
     private Gender gender;
 
-    // ⚠️ location 필드 제거됨 (Redis Geo로 위치 관리)
-    // 위치 정보는 UserLocationService를 통해 Redis에서 관리
+    // 위치명 (예: "Los Angeles, CA")
+    private String locationName;
+    
+    // 위치명 마지막 업데이트 시각
+    private Date locationUpdatedAt;
 
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "user_info_show_me_genders", joinColumns = @JoinColumn(name = "user_info_id"))
@@ -50,12 +53,13 @@ public class UserInfoEntity {
     private List<String> photoUrls;
 
     @Builder
-    public UserInfoEntity(String nickname, Date birthDate, Gender gender, List<Gender> showMeGender, List<String> photoUrls) {
+    public UserInfoEntity(String nickname, Date birthDate, Gender gender, List<Gender> showMeGender, List<String> photoUrls, String locationName) {
         this.nickname = nickname;
         this.birthDate = birthDate;
         this.gender = gender;
         this.showMeGender = showMeGender;
         this.photoUrls = photoUrls;
+        this.locationName = locationName;
     }
 
     // DTO를 Entity로 변환하는 정적 팩토리 메소드
@@ -82,6 +86,14 @@ public class UserInfoEntity {
 
     public void setUser(UserEntity user) {
         this.user = user;
+    }
+    
+    /**
+     * 위치명 업데이트
+     */
+    public void updateLocationName(String locationName) {
+        this.locationName = locationName;
+        this.locationUpdatedAt = new Date();
     }
     
     /**
