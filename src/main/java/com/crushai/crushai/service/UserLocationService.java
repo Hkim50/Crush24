@@ -1,7 +1,7 @@
 package com.crushai.crushai.service;
 
 import com.crushai.crushai.dto.NearbyUserDto;
-import com.crushai.crushai.repository.UserInfoRepository;
+import com.crushai.crushai.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.geo.*;
@@ -18,7 +18,7 @@ public class UserLocationService {
 
     private final RedisTemplate<String, String> redisTemplate;
     private final GeocodingService geocodingService;
-    private final UserInfoRepository userInfoRepository;
+    private final UserRepository userRepository;
 
     private static final String USER_LOCATION_KEY = "user_locations";
     private static final int DEFAULT_SEARCH_LIMIT = 100;
@@ -27,10 +27,10 @@ public class UserLocationService {
     public UserLocationService(
             @Qualifier("geoRedisTemplate") RedisTemplate<String, String> redisTemplate,
             GeocodingService geocodingService,
-            UserInfoRepository userInfoRepository) {
+            UserRepository userRepository) {
         this.redisTemplate = redisTemplate;
         this.geocodingService = geocodingService;
-        this.userInfoRepository = userInfoRepository;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -106,11 +106,12 @@ public class UserLocationService {
             
             if (locationName != null) {
                 // DB 업데이트
-                userInfoRepository.findById(userId).ifPresent(userInfo -> {
-                    userInfo.updateLocationName(locationName);
-                    // maybe unnecessary since it checks for dirty check
-                    userInfoRepository.save(userInfo);
-                    log.info("Location name updated: userId={}, locationName={}", userId, locationName);
+                userRepository.findById(userId).ifPresent(user -> {
+                    if (user.getUserInfo() != null) {
+                        user.getUserInfo().updateLocationName(locationName);
+                        userRepository.save(user);
+                        log.info("Location name updated: userId={}, locationName={}", userId, locationName);
+                    }
                 });
             } else {
                 log.warn("Failed to get location name for userId: {}", userId);

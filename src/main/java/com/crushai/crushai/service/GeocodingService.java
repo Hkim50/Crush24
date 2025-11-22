@@ -1,6 +1,5 @@
 package com.crushai.crushai.service;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -12,18 +11,21 @@ import java.util.concurrent.TimeUnit;
  * 좌표 → 위치명 변환 서비스 (캐싱 포함)
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class GeocodingService {
 
     private final NominatimService nominatimService;
-    
-    @Qualifier("geoRedisTemplate")
     private final RedisTemplate<String, String> redisTemplate;
 
     private static final double CACHE_ROUNDING_DEGREE = 0.05; // 약 5km
     private static final int CACHE_TTL_DAYS = 7;
     private static final String CACHE_KEY_PREFIX = "location:";
+
+    public GeocodingService(NominatimService nominatimService,
+                           @Qualifier("geoRedisTemplate") RedisTemplate<String, String> redisTemplate) {
+        this.nominatimService = nominatimService;
+        this.redisTemplate = redisTemplate;
+    }
 
     /**
      * 좌표를 위치명으로 변환 (캐싱 적용)

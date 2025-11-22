@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.util.concurrent.RateLimiter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -25,7 +26,7 @@ public class NominatimService {
 
     private static final String NOMINATIM_API_URL = "https://nominatim.openstreetmap.org/reverse";
 
-    public NominatimService(RestClient restClient, ObjectMapper objectMapper) {
+    public NominatimService(@Qualifier("nominatimRestClient") RestClient restClient, ObjectMapper objectMapper) {
         this.restClient = restClient;
         this.objectMapper = objectMapper;
         // Nominatim Rate Limit: 1 request/sec
