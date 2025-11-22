@@ -21,4 +21,14 @@ public record LocationSaveResponse(
                 Instant.now()
         );
     }
+    
+    public static LocationSaveResponse accepted(Long userId, double longitude, double latitude) {
+        return new LocationSaveResponse(
+                "Location update is being processed",
+                userId,
+                longitude,
+                latitude,
+                Instant.now()
+        );
+    }
 }

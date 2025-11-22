@@ -29,11 +29,14 @@ public class UserLocationController {
     }
 
     /**
-     * 사용자 위치 저장
+     * 사용자 위치 저장 (비동기 처리)
+     * 
+     * Fire-and-forget 방식: 즉시 202 Accepted 응답 반환
+     * 실제 위치 저장 및 위치명 업데이트는 백그라운드에서 처리
      * 
      * @param customUserDetails 인증된 사용자 정보
      * @param userLocationRequest 위치 정보 (경도, 위도)
-     * @return 저장 결과
+     * @return 202 Accepted (처리 중)
      */
     @PostMapping("/save")
     public ResponseEntity<LocationSaveResponse> saveUserLocation(
@@ -42,20 +45,23 @@ public class UserLocationController {
         
         Long userId = customUserDetails.getUserId();
         
-        log.info("Saving location for userId: {}, lon: {}, lat: {}", 
+        log.info("Received location update for userId: {}, lon: {}, lat: {}", 
             userId, userLocationRequest.longitude(), userLocationRequest.latitude());
         
-        userLocationService.saveUserLocation(
+        // 비동기로 위치 저장 (@Async)
+        userLocationService.saveUserLocationAsync(
             userId, 
             userLocationRequest.longitude(), 
             userLocationRequest.latitude()
         );
 
-        return ResponseEntity.ok(LocationSaveResponse.success(
-            userId,
-            userLocationRequest.longitude(),
-            userLocationRequest.latitude()
-        ));
+        // 즉시 202 Accepted 응답 반환
+        return ResponseEntity.accepted()
+            .body(LocationSaveResponse.accepted(
+                userId,
+                userLocationRequest.longitude(),
+                userLocationRequest.latitude()
+            ));
     }
 
     /**
@@ -68,22 +74,22 @@ public class UserLocationController {
     @GetMapping("/nearby")
     public ResponseEntity<List<NearbyUserDto>> getNearbyUsers(
             @AuthenticationPrincipal CustomUserDetails customUserDetails,
-            @RequestParam(defaultValue = "5.0") 
+            @RequestParam(defaultValue = "5.0")
             @Min(value = 1, message = "반경은 최소 1km 이상이어야 합니다")
             @Max(value = 50, message = "반경은 최대 50km 이하여야 합니다")
             double radiusKm) {
-        
+
         Long userId = customUserDetails.getUserId();
-        
+
         log.info("Searching nearby users for userId: {}, radius: {}km", userId, radiusKm);
-        
+
         List<NearbyUserDto> nearbyUsers = userLocationService.getUsersWithinRadius(userId, radiusKm);
-        
+
         return ResponseEntity.ok(nearbyUsers);
     }
 
     /**
-     * 사용자 위치 삭제 (로그아웃 또는 탈퇴 시)
+     * 사용자 위치 삭제 (탈퇴 시)
      * 
      * @param customUserDetails 인증된 사용자 정보
      * @return 삭제 결과

@@ -8,6 +8,7 @@ import org.springframework.data.geo.*;
 import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.GeoOperations;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -31,6 +32,25 @@ public class UserLocationService {
         this.redisTemplate = redisTemplate;
         this.geocodingService = geocodingService;
         this.userRepository = userRepository;
+    }
+
+    /**
+     * 유저 위치 저장 (비동기)
+     * 
+     * Fire-and-forget 방식으로 백그라운드에서 처리
+     * 
+     * @param userId 사용자 ID
+     * @param longitude 경도
+     * @param latitude 위도
+     */
+    @Async
+    public void saveUserLocationAsync(Long userId, double longitude, double latitude) {
+        try {
+            saveUserLocation(userId, longitude, latitude);
+        } catch (Exception e) {
+            log.error("Async location save failed for userId: {}", userId, e);
+            // 비동기 처리이므로 예외를 던지지 않음
+        }
     }
 
     /**
