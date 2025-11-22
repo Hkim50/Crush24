@@ -27,9 +27,6 @@ public class UserInfoDto {
     // 성별: 필수 선택
     private Gender gender; //  (예: Gender.MALE, Gender.FEMALE)
 
-    // 위치: 위치 권한 또는 수동 입력
-    private String location; // 좌표 또는 지역명으로 관리할 수 있음
-
     // 매칭 대상 성별: 최소 1개
     @Size(min = 1, message = "매칭 대상 성별은 최소 하나 이상 선택해야 합니다.")
     private List<Gender> showMeGender;
@@ -37,10 +34,17 @@ public class UserInfoDto {
     // 사진: 2장에서 5장
     private List<String> photos; // 이미지 URL 또는 파일 이름 리스트
 
-    public UserInfoDto(Gender gender, String name, String location, List<Gender> showMeGender, List<String> photos) {
+    public UserInfoDto(Gender gender, String name, List<Gender> showMeGender, List<String> photos) {
         this.gender = gender;
         this.name = name;
-        this.location = location;
+        this.showMeGender = showMeGender;
+        this.photos = photos;
+    }
+
+    public UserInfoDto(String name, Date birthDate, Gender gender, List<Gender> showMeGender, List<String> photos) {
+        this.name = name;
+        this.birthDate = birthDate;
+        this.gender = gender;
         this.showMeGender = showMeGender;
         this.photos = photos;
     }

@@ -27,6 +27,20 @@ public class OnboardingController {
         this.userInfoService = userInfoService;
     }
 
+    /**
+     * 온보딩 완료 API
+     * 
+     * 프로필 정보(이름, 생년월일, 성별, 사진 등)만 저장합니다.
+     * 
+     * ⚠️ 중요: 위치 정보는 별도로 저장해야 합니다!
+     * 온보딩 완료 후 클라이언트에서 POST /api/location/save 를 즉시 호출하세요.
+     * (Fire-and-forget 방식으로 응답을 기다리지 않고 호출)
+     * 
+     * @param userInfoDto 사용자 프로필 정보 (위치 정보 제외)
+     * @param images 프로필 사진 (2-5장)
+     * @param userDetails 인증된 사용자 정보
+     * @return 온보딩 완료 응답
+     */
     @PostMapping(value = "/onboarding", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> createUserInfo(@RequestPart("userInfo") @Valid UserInfoDto userInfoDto,
                                             @RequestPart("images") List<MultipartFile> images,
