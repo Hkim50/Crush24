@@ -105,6 +105,60 @@ public class ChatServiceClient {
         }
     }
 
+    /**
+     * 여러 채팅방의 정보 일괄 조회 (내부 API)
+     * 
+     * @param chatRoomIds 조회할 채팅방 ID 목록
+     * @return chatRoomId -> ChatRoomInfo 맵
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, ChatRoomInfo> getBatchChatRoomInfo(List<String> chatRoomIds) {
+        try {
+            if (chatRoomIds == null || chatRoomIds.isEmpty()) {
+                return Map.of();
+            }
+
+            log.info("Requesting chat service for {} chat rooms info", chatRoomIds.size());
+            
+            Map<String, Object> request = new HashMap<>();
+            request.put("chatRoomIds", chatRoomIds);
+            
+            Map<String, Map<String, Object>> response = webClientBuilder.build()
+                    .post()
+                    .uri(chatServiceUrl + "/api/internal/chat/rooms/batch-info")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("X-Internal-API-Key", "${internal.api.key:default-secret-key}")  // TODO: 환경변수로 이동
+                    .bodyValue(request)
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .timeout(Duration.ofSeconds(10))
+                    .block();
+            
+            if (response == null) {
+                log.warn("Chat service returned null response");
+                return Map.of();
+            }
+
+            // Map<String, Object> -> Map<String, ChatRoomInfo> 변환
+            Map<String, ChatRoomInfo> result = new HashMap<>();
+            response.forEach((chatRoomId, infoMap) -> {
+                ChatRoomInfo info = ChatRoomInfo.builder()
+                        .lastMessage((String) infoMap.get("lastMessage"))
+                        .lastMessageAt((String) infoMap.get("lastMessageAt"))
+                        .unreadCount((Integer) infoMap.getOrDefault("unreadCount", 0))
+                        .build();
+                result.put(chatRoomId, info);
+            });
+            
+            log.info("Received info for {} chat rooms", result.size());
+            return result;
+            
+        } catch (Exception e) {
+            log.error("Failed to get batch chat room info: {}", e.getMessage(), e);
+            return Map.of();
+        }
+    }
+
     
     /**
      * 채팅 서버 응답 DTO
@@ -120,5 +174,18 @@ public class ChatServiceClient {
         private String matchType;
         private String createdAt;
         private Boolean isActive;
+    }
+
+    /**
+     * 채팅방 정보 DTO
+     */
+    @lombok.Data
+    @lombok.Builder
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
+    public static class ChatRoomInfo {
+        private String lastMessage;
+        private String lastMessageAt;
+        private Integer unreadCount;
     }
 }
