@@ -1,11 +1,14 @@
 package com.crushai.crushai.service;
 
+import com.crushai.crushai.client.ChatServiceClient;
 import com.crushai.crushai.dto.UserInfoDto;
+import com.crushai.crushai.dto.UserInfoResponse;
 import com.crushai.crushai.entity.Match;
 import com.crushai.crushai.entity.UserEntity;
 import com.crushai.crushai.entity.UserInfoEntity;
 import com.crushai.crushai.repository.*;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.geo.Point;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,20 +26,29 @@ public class UserService {
     private final MatchRepository matchRepository;
     private final UserSwipeRepository userSwipeRepository;
     private final UserLikeRepository userLikeRepository;
+    private final UserLocationService userLocationService;
+    private final DeviceTokenRepository deviceTokenRepository;
+    private final ChatServiceClient chatServiceClient;
 
     public UserService(UserRepository userRepository, 
                       RefreshRepository refreshRepository,
                       MatchRepository matchRepository,
                       UserSwipeRepository userSwipeRepository,
-                      UserLikeRepository userLikeRepository) {
+                      UserLikeRepository userLikeRepository,
+                       UserLocationService userLocationService,
+                       DeviceTokenRepository deviceTokenRepository,
+                       ChatServiceClient chatServiceClient) {
         this.userRepository = userRepository;
         this.refreshRepository = refreshRepository;
         this.matchRepository = matchRepository;
         this.userSwipeRepository = userSwipeRepository;
         this.userLikeRepository = userLikeRepository;
+        this.userLocationService = userLocationService;
+        this.deviceTokenRepository = deviceTokenRepository;
+        this.chatServiceClient = chatServiceClient;
     }
 
-    public UserInfoDto getUser(Long userId) {
+    public UserInfoResponse getUser(Long userId) {
         // 1. Find the user by email. If not found, throw an exception.
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with userId: " + userId));
@@ -49,8 +61,7 @@ public class UserService {
             return null;
         }
 
-        // 4. If UserInfo exists, convert it to a DTO and return it.
-        return userInfo.toDto();
+        return userInfo.toResponse();
     }
 
 
@@ -115,12 +126,18 @@ public class UserService {
 
         // 4. RefreshToken 삭제 (현재 유저 관련된 모든 RefreshToken 삭제)
         cleanupUserRefreshTokens(userIdsToDelete);
-        
-        // 5. User 삭제 (UserInfo는 CASCADE로 자동 삭제)
-        userRepository.deleteAll(usersToDelete);
 
-        // TODO
-        // 채팅 프로젝트에서 채팅 및 채팅방 삭제 필요
+        // 5. redis 유저 위치 삭제
+        cleanupUserLocation(userIdsToDelete);
+
+        // 6. device token cleaner
+        cleanupUserDeviceTokens(userIdsToDelete);
+
+        // 7. 채팅 프로젝트에서 채팅 및 채팅방 삭제
+        cleanupChatData(userIdsToDelete);
+
+        // 8. User 삭제 (UserInfo는 CASCADE로 자동 삭제)
+        userRepository.deleteAll(usersToDelete);
         
         log.info("만료된 사용자 {}명 삭제 완료!", usersToDelete.size());
     }
@@ -203,5 +220,41 @@ public class UserService {
         }
 
         log.info("User Refresh Tokens 정리 완료");
+    }
+
+    private void cleanupUserDeviceTokens(List<Long> userIdsToDelete) {
+        deviceTokenRepository.deleteAllById(userIdsToDelete);
+        log.info("User Device Token 정리 완료");
+    }
+
+
+    private void cleanupUserLocation(List<Long> userIdsToDelete) {
+        for (Long userId : userIdsToDelete) {
+            userLocationService.deleteUserLocation(userId);
+        }
+        log.info("User Location 정리 완료");
+    }
+
+    /**
+     * 채팅 데이터 정리
+     * 
+     * 채팅 프로젝트 API를 호출하여 채팅방 및 메시지 삭제
+     * 
+     * @param userIdsToDelete 삭제할 유저 ID 목록
+     */
+    private void cleanupChatData(List<Long> userIdsToDelete) {
+        try {
+            boolean success = chatServiceClient.batchDeleteUsers(userIdsToDelete);
+            
+            if (success) {
+                log.info("채팅 데이터 정리 완료");
+            } else {
+                log.warn("채팅 데이터 정리 실패 - 채팅 서비스 응답 오류");
+            }
+            
+        } catch (Exception e) {
+            log.error("채팅 데이터 정리 중 예외 발생: {}", e.getMessage(), e);
+            // 채팅 서비스 오류로 인해 전체 프로세스가 실패하지 않도록 예외를 잡음
+        }
     }
 }

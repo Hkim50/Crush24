@@ -9,6 +9,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -56,6 +57,51 @@ public class ChatServiceClient {
         } catch (Exception e) {
             log.error("Failed to create chat room", e);
             throw new RuntimeException("Failed to create chat room: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 유저 배치 삭제 요청
+     * 
+     * 채팅 프로젝트에 유저 삭제 요청을 보내 채팅방 및 메시지 삭제
+     * 
+     * @param userIds 삭제할 유저 ID 목록
+     * @return 삭제 성공 여부
+     */
+    @SuppressWarnings("unchecked")
+    public boolean batchDeleteUsers(List<Long> userIds) {
+        try {
+            log.info("Requesting chat service to delete {} users", userIds.size());
+            
+            Map<String, Object> request = new HashMap<>();
+            request.put("userIds", userIds);
+            
+            Map<String, Object> response = webClientBuilder.build()
+                    .post()
+                    .uri(chatServiceUrl + "/api/users/batch-delete")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(request)
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .timeout(Duration.ofSeconds(30))  // 배치 삭제는 시간이 걸릴 수 있음
+                    .block();
+            
+            if (response != null && Boolean.TRUE.equals(response.get("success"))) {
+                log.info("Chat service successfully deleted data for {} users. " +
+                        "Deleted {} chat rooms and {} messages",
+                        userIds.size(),
+                        response.get("deletedChatRooms"),
+                        response.get("deletedMessages"));
+                return true;
+            } else {
+                log.warn("Chat service returned unsuccessful response: {}", response);
+                return false;
+            }
+            
+        } catch (Exception e) {
+            log.error("Failed to delete users in chat service: {}", e.getMessage(), e);
+            // 채팅 서비스 오류가 메인 프로세스를 막지 않도록 false 반환
+            return false;
         }
     }
 
