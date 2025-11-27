@@ -19,6 +19,11 @@ public interface UserLikeRepository extends JpaRepository<UserLike, Long> {
         @Param("toUserId") Long toUserId
     );
     
+    /**
+     * 나를 좋아한 유저 목록 조회 (최신순)
+     */
+    List<UserLike> findAllByToUserIdOrderByCreatedAtDesc(Long toUserId);
+    
     // 유저 삭제 시 사용
     int deleteByFromUserId(Long fromUserId);
     
