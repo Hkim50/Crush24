@@ -128,10 +128,10 @@ public class ChatRoomService {
         // 상대방 정보 구성
         ChatRoomResponse.OtherUserInfo otherUser = ChatRoomResponse.OtherUserInfo.builder()
                 .userId(otherUserId)
-                .name(otherUserInfo.getName())
+                .name(otherUserInfo.getNickname())
                 .age(otherUserInfo.getAge())
-                .profilePhoto(otherUserInfo.getPhotos() != null && !otherUserInfo.getPhotos().isEmpty() 
-                        ? otherUserInfo.getPhotos().get(0) 
+                .profilePhoto(otherUserInfo.getPhotoUrls() != null && !otherUserInfo.getPhotoUrls().isEmpty()
+                        ? otherUserInfo.getPhotoUrls().get(0)
                         : null)
                 .build();
 

@@ -57,8 +57,8 @@ public class ChatController {
     @GetMapping("/rooms")
     public ResponseEntity<Map<String, Object>> getMyChatRooms(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        
-        Long userId = userDetails.getId();
+
+        Long userId = userDetails.getUserId();
         log.info("Fetching chat rooms for user: {}", userId);
         
         List<ChatRoomResponse> chatRooms = chatRoomService.getMyChatRooms(userId);
