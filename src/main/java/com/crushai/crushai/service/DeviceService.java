@@ -56,15 +56,46 @@ public class DeviceService {
                 // 새 토큰 생성
                 createNewToken(userId, normalizedToken, deviceModel, osVersion, appVersion);
             } else {
-                // 같은 사용자의 토큰이면 재활성화
-                token.activate();
-                token.updateDeviceInfo(deviceModel, osVersion, appVersion);
-                log.info("Token reactivated for user: {}", userId);
+                // 같은 사용자의 토큰이면 상태 확인 후 처리
+                if (token.getStatus() != TokenStatus.ACTIVE) {
+                    // INVALID나 EXPIRED 상태일 때만 재활성화
+                    token.activate();
+                    log.info("Token reactivated for user: {} (previous status: {})", 
+                        userId, token.getStatus());
+                } else {
+                    log.debug("Token already active for user: {}", userId);
+                }
+                
+                // 디바이스 정보가 실제로 변경되었을 때만 업데이트
+                if (hasDeviceInfoChanged(token, deviceModel, osVersion, appVersion)) {
+                    token.updateDeviceInfo(deviceModel, osVersion, appVersion);
+                    log.info("Device info updated for user: {} (model: {}, OS: {}, app: {})", 
+                        userId, deviceModel, osVersion, appVersion);
+                }
             }
         } else {
             // 새 토큰 생성
             createNewToken(userId, normalizedToken, deviceModel, osVersion, appVersion);
         }
+    }
+    
+    /**
+     * 디바이스 정보 변경 확인
+     */
+    private boolean hasDeviceInfoChanged(DeviceToken token, 
+                                         String deviceModel, 
+                                         String osVersion, 
+                                         String appVersion) {
+        if (deviceModel != null && !deviceModel.equals(token.getDeviceModel())) {
+            return true;
+        }
+        if (osVersion != null && !osVersion.equals(token.getOsVersion())) {
+            return true;
+        }
+        if (appVersion != null && !appVersion.equals(token.getAppVersion())) {
+            return true;
+        }
+        return false;
     }
     
     /**
